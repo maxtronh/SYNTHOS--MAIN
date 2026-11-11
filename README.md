@@ -60,6 +60,10 @@ The system operates across six coordinated tiers with schema-validated boundarie
 | [`@fable/temporal-runtime`](packages/temporal-runtime) | `packages/temporal-runtime` | Production Temporal runtime controller, worker crash recovery, and deterministic event-history replay harness. |
 | [`@fable/queue-redis`](packages/queue-redis) | `packages/queue-redis` | Priority queue router (`CRITICAL`/`HIGH`/`NORMAL`) and Redis Lua atomic sliding-window backpressure limiter. |
 | [`@fable/secrets-broker`](packages/secrets-broker) | `packages/secrets-broker` | Least-privilege ephemeral credential broker with hard TTL caps and guaranteed sandbox teardown revocation. |
+| [`@fable/runtime-microvm`](packages/runtime-microvm) | `packages/runtime-microvm` | Hardware-isolated Firecracker / gVisor MicroVM sandbox manifest builder with read-only rootfs and memory wiping. |
+| [`@fable/ebpf-auditor`](packages/ebpf-auditor) | `packages/ebpf-auditor` | Real-time eBPF kernel syscall filter, cloud metadata SSRF blocker, and egress allowlist auditor. |
+| [`@fable/attestation-slsa`](packages/attestation-slsa) | `packages/attestation-slsa` | SLSA v1.0 provenance generator and Ed25519 cryptographic signing authority guarding production promotion. |
+| [`@fable/observability-otel`](packages/observability-otel) | `packages/observability-otel` | W3C TraceContext propagator, distributed span tracer, and SRE SLO error-budget burn-rate evaluator. |
 | [`@fable/dashboard`](packages/dashboard) | `packages/dashboard` | Live Operator Control Plane HTTP server and interactive UI for human gates, DAG inspection, and Decision Memos. |
 | [`@fable/cli`](packages/cli) | `packages/cli` | Fable Developer & Operator CLI (`validate`, `adapter`, `run`, `blast-radius`, `telemetry`, `dashboard`). |
 
