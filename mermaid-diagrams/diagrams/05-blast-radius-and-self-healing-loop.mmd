@@ -1,0 +1,13 @@
+flowchart TD
+    Bump["ModuleContract MAJOR Bump"] --> SCIP["ScipSemanticGraph\nCross-Repo Symbol References"]
+    SCIP --> Graph["GraphResolver\nResolve Transitive Downstream Units"]
+    Graph --> Router["PriorityQueueRouter\nCRITICAL Preemption + Lua Rate Limiter"]
+    Router --> Bridge["TemporalBullMQBridge\nDistributedLock + Heartbeat Monitor"]
+
+    Bridge --> Hold{"Release Hold Barrier\nAll Downstream PASS?"}
+    Hold -- No --> Block["Hold Production Release"]
+    Hold -- Yes --> Prod["Eligible for Production"]
+
+    Prod -. "Escape Reported" .-> Recall["RecallLedger\n(<40% 2x -> Shrink AI Layer)"]
+    Recall --> Golden["GoldenRegressionGenerator\nLock Deterministic L1a Vitest Guard"]
+    Golden --> L1a["Permanent L1a Test Suite"]

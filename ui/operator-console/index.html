@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fable Engine v3 — Operator Control Plane</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <div>
+      <h1>🏛️ Fable Engine v3 <span class="badge badge-info">Control Plane</span></h1>
+      <p class="subtitle">Durable Temporal DAGs • Human Gate SLAs • Dual Precision/Recall Telemetry</p>
+    </div>
+    <button class="btn-refresh" onclick="loadDashboard()">↻ Refresh State</button>
+  </header>
+
+  <div class="grid" id="metrics-grid">
+    <div class="card"><div class="metric-label">Total Workflows</div><div class="metric-val" id="m-wf-count">-</div></div>
+    <div class="card"><div class="metric-label">Pending Approval</div><div class="metric-val" id="m-pending">-</div></div>
+    <div class="card"><div class="metric-label">Avg Module Cost</div><div class="metric-val" id="m-cost">-</div></div>
+    <div class="card"><div class="metric-label">P95 Pipeline Latency</div><div class="metric-val" id="m-p95">-</div></div>
+  </div>
+
+  <div class="section-title">⚡ Active & Recent Workflows</div>
+  <div id="workflows-container">Loading workflows...</div>
+
+  <div class="section-title">📝 Escalated Decision Memos (3-Cycle Patch Cap)</div>
+  <div id="memos-container">Loading memos...</div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

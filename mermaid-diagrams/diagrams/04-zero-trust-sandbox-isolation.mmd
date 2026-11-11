@@ -1,0 +1,15 @@
+flowchart TD
+    Job["Node Verification Job"] --> Broker["SecretsBroker.issueLease\nMax TTL 15m, Never prod:*"]
+    Broker --> Route{"stateHooks Flag"}
+
+    Route -- false --> MicroVM["Path A: MicroVMSandbox / EphemeralSandbox\nRead-Only Rootfs, SMT Off, Seccomp >= 2"]
+    Route -- true --> Stateful["Path B: StatefulSandbox\nIsolated Temporary Schema / Dry-Run"]
+
+    MicroVM --> eBPF["EbpfRuntimeAuditor\nKernel Syscall & Socket Monitor"]
+    Stateful --> eBPF
+
+    eBPF -- "ptrace/mount/chroot or 169.254.169.254" --> Kill["DENY_AND_KILL\nImmediate Sandbox Termination"]
+    eBPF -- "Allowed Syscall & Allowlisted Egress" --> Pass["Gate Execution Complete"]
+
+    Kill --> Cleanup["finally: destroy Sandbox + wipe Memory + revokeAllForJob"]
+    Pass --> Cleanup

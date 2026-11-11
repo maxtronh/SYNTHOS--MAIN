@@ -1,0 +1,31 @@
+flowchart LR
+    subgraph W0 ["Foundation: Core Engine (Phases 1 to 9)"]
+        P1_9["Contracts, Temporal DAG, Dual Sandboxes\nBlast Radius, Retrieval, Ledgers, Multi-LLM\nWorker Bridge, Dashboard UI & CLI"]
+    end
+
+    subgraph W1 ["Wave 1: Live Persistence & Infra"]
+        P14["P14: Postgres + pgvector"] --> P15["P15: Temporal Replay"]
+        P15 --> P16["P16: Redis Rate Limiter"]
+        P16 --> P13["P13: Ephemeral Secrets Broker"]
+    end
+
+    subgraph W2 ["Wave 2: Zero-Trust Runtime & Tracing"]
+        P10["P10: Firecracker MicroVM"] --> P12["P12: eBPF Syscall Auditor"]
+        P12 --> P11["P11: Ed25519 SLSA Signing"]
+        P11 --> P28["P28: OTel Tracing & SLO Burn"]
+    end
+
+    subgraph W3 ["Wave 3: GitOps, Verification & Self-Healing"]
+        P17["P17: GitOps PR Bot"] --> P22["P22: SCIP Cross-Repo Graph"]
+        P22 --> P25["P25: AST Watcher"]
+        P25 --> P21["P21/19/20: Mutation, Chaos, Formal"]
+        P21 --> P24["P24/23: Golden Tests & Adaptive Router"]
+    end
+
+    subgraph W4 ["Wave 4: Autonomous Rollout & Governance"]
+        P18["P18: Canary Auto-Rollback"] --> P26["P26: Multi-Tenant OPA RBAC"]
+        P26 --> P27["P27: FinOps Budget Governor"]
+        P27 --> P29["P29: IDE Companion & Dry-Run"]
+    end
+
+    W0 --> W1 --> W2 --> W3 --> W4

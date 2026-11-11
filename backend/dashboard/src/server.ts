@@ -1,6 +1,21 @@
+import fs from 'fs';
 import http from 'http';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { DashboardStateStore } from './store.js';
 import { renderOperatorConsoleHtml } from './ui-template.js';
+
+const UI_CONSOLE_DIR = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../../../ui/operator-console'
+);
+
+const UI_STATIC_MIME: Record<string, string> = {
+  '/': 'text/html; charset=utf-8',
+  '/index.html': 'text/html; charset=utf-8',
+  '/styles.css': 'text/css; charset=utf-8',
+  '/app.js': 'application/javascript; charset=utf-8',
+};
 
 export class OperatorDashboardServer {
   private readonly store: DashboardStateStore;
@@ -26,10 +41,8 @@ export class OperatorDashboardServer {
       }
 
       try {
-        if (method === 'GET' && pathname === '/') {
-          res.setHeader('Content-Type', 'text/html; charset=utf-8');
-          res.writeHead(200);
-          res.end(renderOperatorConsoleHtml());
+        if (method === 'GET' && UI_STATIC_MIME[pathname] !== undefined) {
+          this.serveStaticUiAsset(pathname, res);
           return;
         }
 
@@ -117,6 +130,28 @@ export class OperatorDashboardServer {
         else resolve();
       });
     });
+  }
+
+  private serveStaticUiAsset(pathname: string, res: http.ServerResponse): void {
+    const fileName = pathname === '/' ? 'index.html' : pathname.slice(1);
+    const fullPath = path.join(UI_CONSOLE_DIR, fileName);
+    const mimeType = UI_STATIC_MIME[pathname] ?? 'text/plain; charset=utf-8';
+
+    res.setHeader('Content-Type', mimeType);
+    if (fs.existsSync(fullPath)) {
+      res.writeHead(200);
+      res.end(fs.readFileSync(fullPath, 'utf8'));
+      return;
+    }
+
+    if (fileName === 'index.html') {
+      res.writeHead(200);
+      res.end(renderOperatorConsoleHtml());
+      return;
+    }
+
+    res.writeHead(404);
+    res.end('Asset not found');
   }
 
   private parseJsonBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {

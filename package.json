@@ -4,11 +4,12 @@
   "private": true,
   "description": "Fable Engine v3 — Deterministic, Tool-First Verification & Orchestration Platform",
   "workspaces": [
-    "packages/*"
+    "backend/*",
+    "frontend/*"
   ],
   "type": "module",
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "node scripts/build-workspaces.mjs",
     "test": "npm run test --workspaces --if-present",
     "test:acceptance": "vitest run test/acceptance",
     "lint": "npm run lint --workspaces --if-present",

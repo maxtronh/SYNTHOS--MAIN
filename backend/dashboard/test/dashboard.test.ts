@@ -99,6 +99,14 @@ describe('Operator Dashboard & Human Review Server Suite (Phase 9)', () => {
     const html = await htmlRes.text();
     expect(html).toContain('Fable Engine v3');
     expect(html).toContain('Active & Recent Workflows');
+
+    const cssRes = await fetch(`http://localhost:${port}/styles.css`);
+    expect(cssRes.status).toBe(200);
+    expect(await cssRes.text()).toContain('--primary');
+
+    const jsRes = await fetch(`http://localhost:${port}/app.js`);
+    expect(jsRes.status).toBe(200);
+    expect(await jsRes.text()).toContain('loadDashboard');
   });
 
   it('exposes workflows, memos, and telemetry APIs', async () => {

@@ -1,0 +1,27 @@
+sequenceDiagram
+    participant Dev as Developer / PR Bot
+    participant OPA as OPA Policy Engine (P26)
+    participant DAG as Temporal DAGEngine (P2 & P15)
+    participant Sec as SecretsBroker (P13)
+    participant GR as GateRunner / MicroVM (P3 & P10)
+    participant SLSA as SLSA Authority (P11)
+    participant Canary as CanaryRolloutController (P18)
+
+    Dev->>OPA: Submit DAGBlueprint & Check SSO + RBAC
+    OPA-->>DAG: Authorized (Start 24h/48h Approval Timer)
+    Dev->>DAG: Human Approve Signal (UI / CLI)
+    DAG->>Sec: Issue Short-Lived Scoped Token (TTL <= 15m)
+    Sec-->>GR: Ephemeral Lease Bound to Job
+    GR->>GR: Run L0, L1a, L3 inside MicroVM + eBPF Auditor
+
+    alt All Authoritative Gates PASS
+        GR-->>DAG: PASS Verdicts
+        GR->>Sec: Revoke Lease & Destroy Sandbox in finally
+        DAG->>SLSA: Sign Canonical SLSA v1.0 Provenance (Ed25519)
+        SLSA-->>Canary: Verified Signature + Human Release Approval
+        Canary->>Canary: Shift Traffic 5% -> 25% -> 50% -> 100%
+    else Authoritative Gate FAIL
+        GR-->>DAG: FAIL Verdict (No Retry on Deterministic Fault)
+        GR->>Sec: Revoke Lease & Destroy Sandbox in finally
+        DAG->>DAG: Cancel Downstream Dependent Nodes
+    end

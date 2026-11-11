@@ -1,0 +1,24 @@
+flowchart TD
+    User["Goal Submission & PR Event"] --> PRBot["GitOps PR Bot & OPA Governance"]
+    PRBot --> T1["Tier 1: Architect & Meta-Reviewer\nModuleContract, DAGBlueprint, MetaReviewer"]
+    T1 --> Indep["ModelGateway.validateIndependence\nArchitect vs Meta-Reviewer Family Check"]
+    Indep --> Gate1{"Human Gate 1\n24h Alert / 48h Stale SLA"}
+
+    Gate1 -- Approved --> T0["Tier 0: Temporal Orchestrator\nDAGEngine + ReplayDeterminismHarness"]
+    T0 --> Builder["Tier 2: Deterministic Builder\nZod Schema-Derived Adapters (0 Freehand Logic)"]
+    Builder --> Route{"stateHooks Flag?"}
+
+    Route -- "false (Pure Code)" --> PathA["Tier 3a: Path A Ephemeral Sandbox\nMicroVM / Docker + eBPF Firewall"]
+    Route -- "true (Migrations/DB)" --> PathB["Tier 3b: Path B Stateful Sandbox\nIsolated Schema Dry-Run + Auto Teardown"]
+
+    PathA --> Gates["GateRunner: L0 (<60s) -> L1a (<3m) -> L1b Diff Mutation -> L3 Chaos/Formal"]
+    PathB --> Gates
+
+    Gates -.-> Retrieval["Tier 4a: ASTChunker + pgvector\nAstInvalidationWatcher (Incremental SHA-256)"]
+    Retrieval --> AI["Tier 4b: AdaptiveModelRouter + 4 Adversarial Personas\nLLMCircuitBreaker (DEFERRED on Outage)"]
+    AI -. "Fail (Max 3 Cycles)" .-> Memo["DecisionMemo Escalation\nAssigned to Senior Engineer"]
+
+    Gates --> Blast["Tier 5a: SCIP Semantic Graph + BlastRadiusResolver\nPriorityQueueRouter + TemporalBullMQBridge"]
+    Blast --> SLSA["Tier 5b: Ed25519 SLSA Provenance Signing"]
+    SLSA --> Gate2{"Human Gate 2\nRelease Promotion (Separation of Duties)"}
+    Gate2 -- Approved --> Canary["Phase 18: CanaryRolloutController\n5% -> 25% -> 50% -> 100% + Auto-Rollback"]
