@@ -17,10 +17,13 @@
     "@fable/blast-radius-resolver": "*",
     "@fable/builder-deterministic": "*",
     "@fable/contracts": "*",
+    "@fable/dashboard": "*",
     "@fable/gate-runner": "*",
     "@fable/ledger-telemetry": "*",
+    "@fable/llm-gateway": "*",
     "@fable/orchestrator-temporal": "*",
     "@fable/retrieval-pgvector": "*",
+    "@fable/worker-bridge": "*",
     "commander": "^12.1.0"
   },
   "devDependencies": {

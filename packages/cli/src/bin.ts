@@ -13,6 +13,7 @@ import { DAGEngine, type NodeExecutionHandler } from '@fable/orchestrator-tempor
 import { GateRunner } from '@fable/gate-runner';
 import { GraphResolver, BlastRadiusDispatcher } from '@fable/blast-radius-resolver';
 import { PrecisionLedger, RecallLedger, OperationalMetricsTracker } from '@fable/ledger-telemetry';
+import { OperatorDashboardServer } from '@fable/dashboard';
 
 const program = new Command();
 
@@ -254,6 +255,22 @@ program
     console.log(`Precision Policy: Retires if < 30%, Down-samples if < 50%`);
     console.log(`Recall Policy: Shrinks AI layer if < 40% across 2 consecutive batches`);
     console.log(`Average Module Cost: $${metrics.getAverageCostPerModule().avgTotalCost.toFixed(4)}`);
+  });
+
+/**
+ * Command: fable dashboard
+ */
+program
+  .command('dashboard')
+  .description('Start the Fable Engine v3 Operator Control Plane Dashboard')
+  .option('-p, --port <port>', 'Port to listen on', '3000')
+  .action(async (options) => {
+    const port = parseInt(options.port, 10) || 3000;
+    const server = new OperatorDashboardServer();
+    const actualPort = await server.start(port);
+    console.log(`\n🏛️  Fable Engine v3 Operator Control Plane running at:`);
+    console.log(`   👉 http://localhost:${actualPort}`);
+    console.log(`\nPress Ctrl+C to shut down.`);
   });
 
 program.parse(process.argv);

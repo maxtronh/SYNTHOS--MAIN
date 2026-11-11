@@ -55,6 +55,9 @@ The system operates across six coordinated tiers with schema-validated boundarie
 | [`@fable/retrieval-pgvector`](packages/retrieval-pgvector) | `packages/retrieval-pgvector` | AST chunking, cosine vector similarity, bounded prompt assembly, LLM circuit breaker, and 3-cycle patch controller. |
 | [`@fable/llm-gateway`](packages/llm-gateway) | `packages/llm-gateway` | Multi-family LLM routing (Gemini, Claude, OpenAI), Tier 1 model independence validation, and adversarial persona engine. |
 | [`@fable/ledger-telemetry`](packages/ledger-telemetry) | `packages/ledger-telemetry` | Dual precision/recall ledgers, human bug adjudication, and P50/P95 latency/cost metrics. |
+| [`@fable/worker-bridge`](packages/worker-bridge) | `packages/worker-bridge` | Temporal-BullMQ bridge with Redis distributed idempotency locks, activity heartbeat monitoring, and DLQ handling. |
+| [`@fable/dashboard`](packages/dashboard) | `packages/dashboard` | Live Operator Control Plane HTTP server and interactive UI for human gates, DAG inspection, and Decision Memos. |
+| [`@fable/cli`](packages/cli) | `packages/cli` | Fable Developer & Operator CLI (`validate`, `adapter`, `run`, `blast-radius`, `telemetry`, `dashboard`). |
 
 ---
 
