@@ -54,6 +54,33 @@
     "deadLetterQueueName": "blast-radius-dlq",
     "idempotencyTtlSeconds": 86400
   },
+  "ai": {
+    "defaultFamily": "gemini",
+    "metaReviewerFamily": "claude",
+    "models": {
+      "gemini": {
+        "modelName": "gemini-1.5-pro",
+        "temperature": 0.2,
+        "maxTokens": 4096
+      },
+      "claude": {
+        "modelName": "claude-3-5-sonnet-20241022",
+        "temperature": 0.1,
+        "maxTokens": 4096
+      },
+      "openai": {
+        "modelName": "gpt-4o",
+        "temperature": 0.2,
+        "maxTokens": 4096
+      }
+    },
+    "personas": [
+      { "id": "security-fuzzer", "family": "gemini", "focus": "injection-auth-bypass" },
+      { "id": "data-integrity", "family": "claude", "focus": "schema-drift-concurrency" },
+      { "id": "concurrency-racer", "family": "openai", "focus": "race-conditions-deadlocks" },
+      { "id": "edge-chaos", "family": "gemini", "focus": "rate-limits-boundary-conditions" }
+    ]
+  },
   "retrieval": {
     "vectorDimensions": 1536,
     "topKDefault": 5,

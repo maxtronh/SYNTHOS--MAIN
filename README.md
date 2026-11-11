@@ -53,6 +53,7 @@ The system operates across six coordinated tiers with schema-validated boundarie
 | [`@fable/gate-runner`](packages/gate-runner) | `packages/gate-runner` | Dual sandbox engine (Path A Ephemeral & Path B Stateful) with L0/L1a/L1b/L3 execution budgets and cleanup guarantees. |
 | [`@fable/blast-radius-resolver`](packages/blast-radius-resolver) | `packages/blast-radius-resolver` | Major-version change detection, transitive graph traversal, idempotent BullMQ re-verification dispatch, and release hold barriers. |
 | [`@fable/retrieval-pgvector`](packages/retrieval-pgvector) | `packages/retrieval-pgvector` | AST chunking, cosine vector similarity, bounded prompt assembly, LLM circuit breaker, and 3-cycle patch controller. |
+| [`@fable/llm-gateway`](packages/llm-gateway) | `packages/llm-gateway` | Multi-family LLM routing (Gemini, Claude, OpenAI), Tier 1 model independence validation, and adversarial persona engine. |
 | [`@fable/ledger-telemetry`](packages/ledger-telemetry) | `packages/ledger-telemetry` | Dual precision/recall ledgers, human bug adjudication, and P50/P95 latency/cost metrics. |
 
 ---
