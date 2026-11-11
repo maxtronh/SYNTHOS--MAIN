@@ -1,0 +1,80 @@
+{
+  "system": {
+    "name": "Fable Engine v3",
+    "version": "3.0.0",
+    "environment": "production"
+  },
+  "orchestrator": {
+    "temporal": {
+      "address": "localhost:7233",
+      "namespace": "fable-production",
+      "taskQueue": "fable-main-queue",
+      "retryPolicy": {
+        "initialIntervalMs": 1000,
+        "backoffCoefficient": 2.0,
+        "maximumIntervalMs": 30000,
+        "maxAttempts": 5
+      }
+    },
+    "slas": {
+      "approvalAlertHours": 24,
+      "approvalStalePauseHours": 48,
+      "patchCycleCap": 3,
+      "patchExpiryHours": 48,
+      "releasePromotionExpiryHours": 48
+    }
+  },
+  "gateRunner": {
+    "budgetsMs": {
+      "L0": 60000,
+      "L1a": 180000,
+      "L1b": 1800000,
+      "L3": 300000
+    },
+    "sandboxes": {
+      "ephemeral": {
+        "image": "fable/sandbox-ephemeral:3.0.0",
+        "egressAllowlist": [
+          "minio.internal",
+          "llm-gateway.internal"
+        ]
+      },
+      "stateful": {
+        "image": "fable/sandbox-stateful:3.0.0",
+        "resourceQuotas": {
+          "cpu": "2.0",
+          "memory": "4Gi"
+        }
+      }
+    }
+  },
+  "blastRadius": {
+    "redisUrl": "redis://localhost:6379",
+    "bullmqQueueName": "blast-radius-reverification",
+    "deadLetterQueueName": "blast-radius-dlq",
+    "idempotencyTtlSeconds": 86400
+  },
+  "retrieval": {
+    "vectorDimensions": 1536,
+    "topKDefault": 5,
+    "maxTokensApprox": 2000,
+    "circuitBreaker": {
+      "failureThreshold": 3,
+      "recoveryTimeoutMs": 15000
+    }
+  },
+  "telemetry": {
+    "precisionThreshold": {
+      "downsampleBelow": 0.5,
+      "retireBelow": 0.3
+    },
+    "recallThreshold": {
+      "shrinkLayerBelow": 0.4,
+      "consecutiveBatches": 2
+    },
+    "alertDestinations": {
+      "slackWebhook": "https://hooks.slack.com/services/SLACK_WEBHOOK_URL",
+      "pagerDutyServiceKey": "PAGERDUTY_INTEGRATION_KEY"
+    }
+  }
+}
