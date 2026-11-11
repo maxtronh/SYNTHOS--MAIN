@@ -1,1 +1,1 @@
-{"root":["./src/index.ts","./src/secrets-broker.ts","./src/types.ts"],"version":"5.9.3"}
+{"root":["./src/cloud-secrets-backend.ts","./src/index.ts","./src/secrets-broker.ts","./src/types.ts"],"version":"5.9.3"}
