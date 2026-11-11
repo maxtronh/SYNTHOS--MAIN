@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { ModuleContract } from '@fable/contracts';
+import { SecretsBroker } from '@fable/secrets-broker';
 import {
   GateRunner,
   EphemeralSandbox,
@@ -125,5 +126,22 @@ describe('Gate Runner & Dual Sandbox Isolation Suite', () => {
 
     // Further execution on destroyed sandbox must fail
     await expect(stateful.executeCommand('prisma migrate status')).rejects.toThrow('already been torn down');
+  });
+
+  it('issues scoped short-lived lease and revokes it upon sandbox completion or failure', async () => {
+    const broker = new SecretsBroker();
+    const issueSpy = vi.spyOn(broker, 'issueLease');
+    const revokeSpy = vi.spyOn(broker, 'revokeAllForJob');
+
+    await GateRunner.executeModuleVerification({
+      workflowId: 'wf-sec-01',
+      nodeId: 'node-pure',
+      contract: pureCodeContract,
+      secretsBroker: broker,
+      simulateSyntaxError: true,
+    });
+
+    expect(issueSpy).toHaveBeenCalledTimes(1);
+    expect(revokeSpy).toHaveBeenCalledWith('wf-sec-01-node-pure');
   });
 });

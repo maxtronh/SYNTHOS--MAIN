@@ -5,6 +5,7 @@ import type {
   GateStatus,
   SandboxPath,
 } from '@fable/contracts';
+import { SecretsBroker, type SecretScope } from '@fable/secrets-broker';
 import type { ISandboxEnvironment } from '../sandbox/types.js';
 import { EphemeralSandbox } from '../sandbox/ephemeral-sandbox.js';
 import { StatefulSandbox } from '../sandbox/stateful-sandbox.js';
@@ -13,10 +14,18 @@ export interface GateExecutionOptions {
   workflowId: string;
   nodeId: string;
   contract: ModuleContract;
+  secretsBroker?: SecretsBroker | undefined;
   simulateSyntaxError?: boolean | undefined;
   simulateInfraError?: boolean | undefined;
   simulateTimeout?: boolean | undefined;
 }
+
+const GATE_COMMAND_MAP: Record<GateLevel, string> = {
+  L0: 'npm run check:l0',
+  L1a: 'npm run check:l1a',
+  L1b: 'stryker run',
+  L3: 'npm run check:l3',
+};
 
 export class GateRunner {
   public static readonly GATE_BUDGETS_MS: Record<GateLevel, number> = {
@@ -28,38 +37,49 @@ export class GateRunner {
 
   /**
    * Run all required gates for a module contract within the appropriate isolated sandbox.
-   * Guarantees sandbox destruction upon completion, timeout, or failure.
+   * Issues short-lived scoped credentials and guarantees sandbox teardown + credential revocation.
    */
   public static async executeModuleVerification(
     options: GateExecutionOptions
   ): Promise<GateVerdict[]> {
     const { workflowId, nodeId, contract } = options;
-    const requiredGates = contract.requiredGates;
-
-    // Route sandbox based on stateHooks flag (Path A ephemeral vs Path B stateful)
+    const jobId = `${workflowId}-${nodeId}`;
     const sandboxPath: SandboxPath = contract.stateHooks
       ? 'PATH_B_STATEFUL'
       : 'PATH_A_EPHEMERAL';
 
+    const broker = options.secretsBroker ?? new SecretsBroker();
+    const requestedScopes: SecretScope[] = contract.stateHooks
+      ? ['minio:read', 'sandbox:tmp_db']
+      : ['minio:read'];
+
+    const lease = broker.issueLease({
+      jobId,
+      sandboxPath,
+      requestedScopes,
+      ttlMs: contract.executionBudgetMs,
+    });
+
     const sandbox: ISandboxEnvironment = contract.stateHooks
-      ? new StatefulSandbox({ jobId: `${workflowId}-${nodeId}`, stateHooks: true })
-      : new EphemeralSandbox({ jobId: `${workflowId}-${nodeId}` });
+      ? new StatefulSandbox({ jobId, stateHooks: true, environmentVariables: { FABLE_TOKEN: lease.token } })
+      : new EphemeralSandbox({ jobId, environmentVariables: { FABLE_TOKEN: lease.token } });
 
     const verdicts: GateVerdict[] = [];
 
     try {
-      for (const gate of requiredGates) {
+      for (const gate of contract.requiredGates) {
         const verdict = await this.runSingleGate(sandbox, gate, options, sandboxPath);
         verdicts.push(verdict);
 
-        // Blocking gates: any failure on L0 or L1a immediately stops further execution
+        // Blocking gates: any failure on L0 or L1a immediately halts further execution
         if ((gate === 'L0' || gate === 'L1a') && verdict.status !== 'PASS') {
           break;
         }
       }
     } finally {
-      // Cleanup MUST run on success, failure, timeout, and cancellation
+      // Cleanup and credential revocation MUST run on success, failure, timeout, and cancellation
       await sandbox.destroy();
+      broker.revokeAllForJob(jobId);
     }
 
     return verdicts;
@@ -72,88 +92,73 @@ export class GateRunner {
     sandboxPath: SandboxPath
   ): Promise<GateVerdict> {
     const budgetMs = this.GATE_BUDGETS_MS[gate];
-    const startTime = Date.now();
 
-    // Check simulated failure flags
     if (options.simulateTimeout) {
-      return {
-        verdictId: `v-${options.nodeId}-${gate}-${Date.now()}`,
-        workflowId: options.workflowId,
-        nodeId: options.nodeId,
-        contractId: options.contract.id,
-        contractVersion: options.contract.version,
-        gate,
+      return this.buildVerdict(options, gate, sandboxPath, {
         status: 'TIMEOUT',
-        sandboxPath,
-        executionDurationMs: budgetMs + 100,
-        isAuthoritative: true,
+        durationMs: budgetMs + 100,
         errorDetails: [`Execution exceeded strict gate SLA budget of ${budgetMs}ms`],
         metrics: { durationMs: budgetMs + 100 },
-        evaluatedAt: new Date().toISOString(),
-      };
+      });
     }
 
     if (options.simulateInfraError) {
-      return {
-        verdictId: `v-${options.nodeId}-${gate}-${Date.now()}`,
-        workflowId: options.workflowId,
-        nodeId: options.nodeId,
-        contractId: options.contract.id,
-        contractVersion: options.contract.version,
-        gate,
+      return this.buildVerdict(options, gate, sandboxPath, {
         status: 'INFRA_ERROR',
-        sandboxPath,
-        executionDurationMs: 150,
-        isAuthoritative: true,
+        durationMs: 150,
         errorDetails: ['Transient infrastructure failure: Runner container unreachable'],
-        metrics: {},
-        evaluatedAt: new Date().toISOString(),
-      };
+      });
     }
 
     if (options.simulateSyntaxError) {
-      return {
-        verdictId: `v-${options.nodeId}-${gate}-${Date.now()}`,
-        workflowId: options.workflowId,
-        nodeId: options.nodeId,
-        contractId: options.contract.id,
-        contractVersion: options.contract.version,
-        gate,
+      return this.buildVerdict(options, gate, sandboxPath, {
         status: 'FAIL',
-        sandboxPath,
-        executionDurationMs: 1200,
-        isAuthoritative: true,
+        durationMs: 1200,
         errorDetails: ['SyntaxError: Unexpected token in module implementation'],
         metrics: { lintErrors: 3 },
-        evaluatedAt: new Date().toISOString(),
-      };
+      });
     }
 
-    // Normal command execution per gate
-    let cmd = 'tsc --noEmit';
-    const args: string[] = [];
+    const cmd = gate === 'L3' && sandboxPath === 'PATH_B_STATEFUL'
+      ? 'prisma migrate deploy --dry-run'
+      : GATE_COMMAND_MAP[gate];
 
-    if (gate === 'L0') {
-      cmd = 'npm run check:l0'; // tsc, eslint, semgrep, zod
-    } else if (gate === 'L1a') {
-      cmd = 'npm run check:l1a'; // vitest, fast-check, coverage
-    } else if (gate === 'L1b') {
-      cmd = 'stryker run'; // mutation testing
-    } else if (gate === 'L3' && sandboxPath === 'PATH_B_STATEFUL') {
-      cmd = 'prisma migrate deploy --dry-run';
+    const startTime = Date.now();
+    const result = await sandbox.executeCommand(cmd, [], budgetMs);
+    const durationMs = Date.now() - startTime;
+
+    const status: GateStatus = result.exitCode === 0
+      ? 'PASS'
+      : (result.exitCode === 125 ? 'INFRA_ERROR' : 'FAIL');
+
+    const errorDetails = result.exitCode !== 0
+      ? [result.stderr || `Process exited with code ${result.exitCode}`]
+      : [];
+
+    return this.buildVerdict(options, gate, sandboxPath, {
+      status,
+      durationMs,
+      errorDetails,
+      metrics: {
+        durationMs,
+        coveragePercent: gate === 'L1a' ? 88.5 : undefined,
+        lintErrors: gate === 'L0' && status === 'PASS' ? 0 : undefined,
+        mutationScore: gate === 'L1b' ? 76.2 : undefined,
+      },
+    });
+  }
+
+  private static buildVerdict(
+    options: GateExecutionOptions,
+    gate: GateLevel,
+    sandboxPath: SandboxPath,
+    outcome: {
+      status: GateStatus;
+      durationMs: number;
+      errorDetails?: string[];
+      metrics?: GateVerdict['metrics'];
     }
-
-    const result = await sandbox.executeCommand(cmd, args, budgetMs);
-    const duration = Date.now() - startTime;
-
-    let status: GateStatus = 'PASS';
-    const errorDetails: string[] = [];
-
-    if (result.exitCode !== 0) {
-      status = result.exitCode === 125 ? 'INFRA_ERROR' : 'FAIL';
-      errorDetails.push(result.stderr || `Process exited with code ${result.exitCode}`);
-    }
-
+  ): GateVerdict {
     return {
       verdictId: `v-${options.nodeId}-${gate}-${Date.now()}`,
       workflowId: options.workflowId,
@@ -161,17 +166,12 @@ export class GateRunner {
       contractId: options.contract.id,
       contractVersion: options.contract.version,
       gate,
-      status,
+      status: outcome.status,
       sandboxPath,
-      executionDurationMs: duration,
-      isAuthoritative: gate !== 'L1b', // L1b mutation is asynchronous advisory release gate
-      errorDetails,
-      metrics: {
-        durationMs: duration,
-        coveragePercent: gate === 'L1a' ? 88.5 : undefined,
-        lintErrors: gate === 'L0' && status === 'PASS' ? 0 : undefined,
-        mutationScore: gate === 'L1b' ? 76.2 : undefined,
-      },
+      executionDurationMs: outcome.durationMs,
+      isAuthoritative: gate !== 'L1b',
+      errorDetails: outcome.errorDetails ?? [],
+      metrics: outcome.metrics ?? {},
       evaluatedAt: new Date().toISOString(),
     };
   }

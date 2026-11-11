@@ -56,6 +56,10 @@ The system operates across six coordinated tiers with schema-validated boundarie
 | [`@fable/llm-gateway`](packages/llm-gateway) | `packages/llm-gateway` | Multi-family LLM routing (Gemini, Claude, OpenAI), Tier 1 model independence validation, and adversarial persona engine. |
 | [`@fable/ledger-telemetry`](packages/ledger-telemetry) | `packages/ledger-telemetry` | Dual precision/recall ledgers, human bug adjudication, and P50/P95 latency/cost metrics. |
 | [`@fable/worker-bridge`](packages/worker-bridge) | `packages/worker-bridge` | Temporal-BullMQ bridge with Redis distributed idempotency locks, activity heartbeat monitoring, and DLQ handling. |
+| [`@fable/persistence-postgres`](packages/persistence-postgres) | `packages/persistence-postgres` | PostgreSQL + pgvector HNSW persistence layer, SQL migrations, immutable audit triggers, and in-memory parity store. |
+| [`@fable/temporal-runtime`](packages/temporal-runtime) | `packages/temporal-runtime` | Production Temporal runtime controller, worker crash recovery, and deterministic event-history replay harness. |
+| [`@fable/queue-redis`](packages/queue-redis) | `packages/queue-redis` | Priority queue router (`CRITICAL`/`HIGH`/`NORMAL`) and Redis Lua atomic sliding-window backpressure limiter. |
+| [`@fable/secrets-broker`](packages/secrets-broker) | `packages/secrets-broker` | Least-privilege ephemeral credential broker with hard TTL caps and guaranteed sandbox teardown revocation. |
 | [`@fable/dashboard`](packages/dashboard) | `packages/dashboard` | Live Operator Control Plane HTTP server and interactive UI for human gates, DAG inspection, and Decision Memos. |
 | [`@fable/cli`](packages/cli) | `packages/cli` | Fable Developer & Operator CLI (`validate`, `adapter`, `run`, `blast-radius`, `telemetry`, `dashboard`). |
 

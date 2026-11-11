@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@fable/contracts": "*",
+    "@fable/secrets-broker": "*",
     "zod": "^3.24.1"
   },
   "devDependencies": {
