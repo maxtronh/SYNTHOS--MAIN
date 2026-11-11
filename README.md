@@ -69,6 +69,10 @@ The system operates across six coordinated tiers with schema-validated boundarie
 | [`@fable/ast-watcher`](packages/ast-watcher) | `packages/ast-watcher` | Real-time SHA-256 content-hash AST invalidation and incremental vector embedding watcher. |
 | [`@fable/verification-advanced`](packages/verification-advanced) | `packages/verification-advanced` | Diff-scoped StrykerJS mutation engine (`L1b`), stateful chaos fault injector (`L3`), and formal state-space verifier. |
 | [`@fable/self-healing`](packages/self-healing) | `packages/self-healing` | Production-escape golden regression lock generator and cost-aware adaptive multi-model router. |
+| [`@fable/canary-rollout`](packages/canary-rollout) | `packages/canary-rollout` | Progressive canary traffic shifter and automated SLO-triggered rollback controller guarded by SLSA signatures. |
+| [`@fable/governance-opa`](packages/governance-opa) | `packages/governance-opa` | Multi-tenant RBAC, SSO verification, and separation-of-duties OPA policy evaluator. |
+| [`@fable/finops-governor`](packages/finops-governor) | `packages/finops-governor` | FinOps token & sandbox compute budget enforcer throttling optional AI spend before deterministic gates. |
+| [`@fable/ide-companion`](packages/ide-companion) | `packages/ide-companion` | IDE extension backend providing contract hints, SCIP blast-radius heatmaps, and 1-click local sandbox dry-runs. |
 | [`@fable/dashboard`](packages/dashboard) | `packages/dashboard` | Live Operator Control Plane HTTP server and interactive UI for human gates, DAG inspection, and Decision Memos. |
 | [`@fable/cli`](packages/cli) | `packages/cli` | Fable Developer & Operator CLI (`validate`, `adapter`, `run`, `blast-radius`, `telemetry`, `dashboard`). |
 
