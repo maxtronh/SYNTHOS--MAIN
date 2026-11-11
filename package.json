@@ -12,12 +12,16 @@
     "build": "node scripts/build-workspaces.mjs",
     "test": "npm run test --workspaces --if-present",
     "test:acceptance": "vitest run test/acceptance",
-    "lint": "npm run lint --workspaces --if-present",
+    "lint": "eslint backend frontend scripts test",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.10.2",
+    "eslint": "^10.14.0",
+    "globals": "^17.14.0",
     "typescript": "^5.7.2",
+    "typescript-eslint": "^8.72.2",
     "vitest": "^2.1.8",
     "zod": "^3.24.1"
   }

@@ -1,0 +1,23 @@
+flowchart LR
+    subgraph W45 ["Wave 4.5: Pre-Production Readiness (8 Open Decisions)"]
+        D1["Temporal HA & PG PITR\nRPO <= 5m / RTO <= 15m"] --> D2["BullMQ DLQ & L3 Catalog\nQuotas & Named Approvers"]
+        D2 --> D3["DR Game-Day Drills\n& Prod Sign-Off"]
+    end
+
+    subgraph W5A ["Wave 5A: CI/CD, Observability & Governance"]
+        P30["P30: GitHub Actions CI\nbuild -> typecheck -> lint -> test"] --> P31["P31: OTel -> PagerDuty\n& SLO Burn Dashboards"]
+        P31 --> P32["P32: OIDC/SAML SSO\n& OPA Separation of Duties"]
+        P32 --> P33["P33: CLI Ops\nfable approve / promote / drift-detect"]
+    end
+
+    subgraph W5B ["Wave 5B: Multi-Region, Vault & Production Rollout"]
+        P34["P34: Multi-Region Canary\nSLSA-Guarded Rollback"] --> P35["P35: SCIP Drift Detection\nCross-Repo Pre-Alerts"]
+        P35 --> P36["P36: Vault / Cloud Secrets\nShort-Lived TTL Leases"]
+        P36 --> P37["P37: DR Failover Drill\n& Production Sign-Off P38"]
+    end
+
+    subgraph W5C ["Wave 5C: Model Registry & Modern UI"]
+        P39["P39: LLM Model Registry\n& Persona Versioning"] --> P40["P40: Operator Console\nReact/Vue Role-Based UI"]
+    end
+
+    W45 --> W5A --> W5B --> W5C

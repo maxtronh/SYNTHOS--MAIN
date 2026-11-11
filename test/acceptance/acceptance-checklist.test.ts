@@ -1,17 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import {
-  MetaReviewer,
-  DAGBlueprintSchema,
-  ModuleContractSchema,
-  type ModuleContract,
-  type DAGBlueprint,
-} from '@fable/contracts';
-import { DeterministicAdapterBuilder } from '@fable/builder-deterministic';
+import { type DAGBlueprint } from '@fable/contracts';
 import { DAGEngine, type NodeExecutionHandler } from '@fable/orchestrator-temporal';
 import { GateRunner, EphemeralSandbox, StatefulSandbox } from '@fable/gate-runner';
-import { GraphResolver, BlastRadiusDispatcher } from '@fable/blast-radius-resolver';
+import { BlastRadiusDispatcher } from '@fable/blast-radius-resolver';
 import {
-  ASTChunker,
   VectorRetriever,
   LLMCircuitBreaker,
   PatchLoopController,
@@ -23,42 +15,6 @@ import {
 } from '@fable/ledger-telemetry';
 
 describe('Fable Engine v3 — Master Acceptance Checklist Suite', () => {
-  // Common test contracts
-  const cAuth: ModuleContract = {
-    id: 'contract-auth',
-    name: 'auth-service',
-    version: '1.0.0',
-    description: 'User authentication and token service',
-    inputs: { username: { type: 'string', required: true } },
-    outputs: { token: { type: 'string', required: true } },
-    stateHooks: false, // Pure code -> Path A
-    dependencies: [],
-    requiredGates: ['L0', 'L1a'],
-    executionBudgetMs: 30000,
-    author: 'architect',
-    createdAt: new Date().toISOString(),
-  };
-
-  const cOrderDb: ModuleContract = {
-    id: 'contract-order-db',
-    name: 'order-db',
-    version: '1.0.0',
-    description: 'Order stateful schema and Prisma migrations',
-    inputs: { token: { type: 'string', required: true } },
-    outputs: { orderId: { type: 'string', required: true } },
-    stateHooks: true, // Stateful -> Path B
-    dependencies: [{ contractId: 'contract-auth', name: 'auth-service', versionRange: '^1.0.0' }],
-    requiredGates: ['L0', 'L1a', 'L3'],
-    executionBudgetMs: 120000,
-    author: 'architect',
-    createdAt: new Date().toISOString(),
-  };
-
-  const contractMap = new Map([
-    [cAuth.id, cAuth],
-    [cOrderDb.id, cOrderDb],
-  ]);
-
   const validBlueprint: DAGBlueprint = {
     blueprintId: 'bp-acceptance-01',
     goalId: 'goal-ecommerce-v3',

@@ -231,7 +231,7 @@ export class DAGEngine {
 
     let attempts = 0;
     const maxAttempts = nodeConfig.retryPolicy?.maxAttempts ?? 1;
-    let finalVerdicts: GateVerdict[] = [];
+    let finalVerdicts: GateVerdict[];
 
     while (attempts < maxAttempts) {
       attempts++;

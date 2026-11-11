@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { DAGBlueprint, GateVerdict } from '@fable/contracts';
+import type { DAGBlueprint } from '@fable/contracts';
 import { DAGEngine, type NodeExecutionHandler } from '../src/index.js';
 
 describe('Temporal DAG Engine & SLA Verification', () => {
