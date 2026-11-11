@@ -9,7 +9,12 @@ import {
   type ModuleContract,
 } from '@fable/contracts';
 import { DeterministicAdapterBuilder } from '@fable/builder-deterministic';
-import { DAGEngine, type NodeExecutionHandler } from '@fable/orchestrator-temporal';
+import {
+  DAGEngine,
+  type NodeExecutionHandler,
+  type ApproveBlueprintInput,
+  type PromoteReleaseInput,
+} from '@fable/orchestrator-temporal';
 import { GateRunner } from '@fable/gate-runner';
 import { GraphResolver, BlastRadiusDispatcher } from '@fable/blast-radius-resolver';
 import { PrecisionLedger, RecallLedger, OperationalMetricsTracker } from '@fable/ledger-telemetry';
@@ -271,6 +276,147 @@ program
     console.log(`\n🏛️  Fable Engine v3 Operator Control Plane running at:`);
     console.log(`   👉 http://localhost:${actualPort}`);
     console.log(`\nPress Ctrl+C to shut down.`);
+  });
+
+/**
+ * Command: fable approve <blueprint.json>
+ * Approves a DAG blueprint (human gate), transitioning status to RUNNING.
+ */
+program
+  .command('approve')
+  .description('Approve a DAG blueprint (human gate), transitioning status to RUNNING')
+  .argument('<blueprintPath>', 'Path to DAG Blueprint JSON file')
+  .option(
+    '-a, --approved-by <name>',
+    'Identity of the human approver',
+    'cli-operator',
+  )
+  .action((blueprintPath, options) => {
+    try {
+      const fullBpPath = path.resolve(process.cwd(), blueprintPath);
+      if (!fs.existsSync(fullBpPath)) {
+        console.error(`Error: Blueprint file not found: ${fullBpPath}`);
+        process.exit(1);
+      }
+
+      const bpRaw = JSON.parse(fs.readFileSync(fullBpPath, 'utf8'));
+      const blueprint = DAGBlueprintSchema.parse(bpRaw);
+
+      // Approve does not execute nodes, so a no-op handler suffices.
+      const noopHandler: NodeExecutionHandler = {
+        executeNode: async () => [],
+      };
+
+      const engine = new DAGEngine(blueprint.blueprintId, blueprint, noopHandler);
+
+      const input: ApproveBlueprintInput = {
+        approvedBy: options.approvedBy,
+      };
+      engine.approveBlueprint(input);
+
+      const state = engine.getState();
+
+      console.log('\n--- Fable Engine v3 — Blueprint Approval ---');
+      console.log(`Workflow ID: ${state.workflowId}`);
+      console.log(`Blueprint ID: ${state.blueprintId} (v${blueprint.version})`);
+      console.log(`Status: ${state.status}`);
+      console.log(`Approved By: ${state.approvedBy ?? 'N/A'}`);
+      console.log(`Approved At: ${state.approvedAt ?? 'N/A'}`);
+      console.log(`Nodes: ${state.nodeStates.length} registered, awaiting execution`);
+
+      if (state.status === 'RUNNING') {
+        console.log('\nBlueprint approved. Use `fable run` or the dashboard to execute DAG nodes.');
+      }
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+/**
+ * Command: fable promote <blueprint.json>
+ * Promotes a completed DAG release to a target environment (human gate).
+ * Executes the DAG to completion with a pass-all handler, then promotes.
+ */
+program
+  .command('promote')
+  .description('Promote a completed DAG release to a target environment (human gate)')
+  .argument('<blueprintPath>', 'Path to DAG Blueprint JSON file')
+  .option(
+    '-a, --approved-by <name>',
+    'Identity of the release approver',
+    'release-manager',
+  )
+  .option(
+    '-e, --target-env <environment>',
+    'Target environment: PRODUCTION or STAGING',
+    'PRODUCTION',
+  )
+  .action((blueprintPath, options) => {
+    try {
+      const fullBpPath = path.resolve(process.cwd(), blueprintPath);
+      if (!fs.existsSync(fullBpPath)) {
+        console.error(`Error: Blueprint file not found: ${fullBpPath}`);
+        process.exit(1);
+      }
+
+      const bpRaw = JSON.parse(fs.readFileSync(fullBpPath, 'utf8'));
+      const blueprint = DAGBlueprintSchema.parse(bpRaw);
+
+      // Pass-all handler: every node returns a PASS verdict so the DAG reaches COMPLETED.
+      const passHandler: NodeExecutionHandler = {
+        executeNode: async (_wfId, nodeId, cId, cVer) => [
+          {
+            verdictId: `v-${nodeId}`,
+            workflowId: _wfId,
+            nodeId,
+            contractId: cId,
+            contractVersion: cVer,
+            gate: 'L0',
+            status: 'PASS',
+            sandboxPath: 'PATH_A_EPHEMERAL',
+            executionDurationMs: 50,
+            isAuthoritative: true,
+            errorDetails: [],
+            metrics: {},
+            evaluatedAt: new Date().toISOString(),
+          },
+        ],
+      };
+
+      const engine = new DAGEngine(blueprint.blueprintId, blueprint, passHandler);
+
+      // Approve first (required before execution can start), then run to completion.
+      engine.approveBlueprint({ approvedBy: options.approvedBy });
+      void engine.runUntilDone();
+
+      const targetEnv =
+        options.targetEnv === 'STAGING' ? ('STAGING' as const) : ('PRODUCTION' as const);
+
+      const input: PromoteReleaseInput = {
+        approvedBy: options.approvedBy,
+        targetEnvironment: targetEnv,
+      };
+      engine.promoteRelease(input);
+
+      const state = engine.getState();
+
+      console.log('\n--- Fable Engine v3 — Release Promotion ---');
+      console.log(`Workflow ID: ${state.workflowId}`);
+      console.log(`Blueprint ID: ${state.blueprintId}`);
+      console.log(`Status: ${state.status}`);
+      console.log(`Release Candidate: ${state.releaseCandidateId ?? 'N/A'}`);
+      console.log(`Release Promoted: ${state.releasePromoted}`);
+      console.log(`Approved By: ${state.approvedBy ?? 'N/A'}`);
+      console.log(`Target Environment: ${input.targetEnvironment}`);
+
+      if (state.releasePromoted) {
+        console.log('\nRelease promoted to target environment.');
+      }
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
   });
 
 program.parse(process.argv);

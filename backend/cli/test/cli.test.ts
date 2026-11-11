@@ -7,6 +7,47 @@ import {
 import { DeterministicAdapterBuilder } from '@fable/builder-deterministic';
 import { GraphResolver, BlastRadiusDispatcher } from '@fable/blast-radius-resolver';
 import { PrecisionLedger } from '@fable/ledger-telemetry';
+import { DAGEngine, type NodeExecutionHandler } from '@fable/orchestrator-temporal';
+
+const testBlueprint = () =>
+  DAGBlueprintSchema.parse({
+    blueprintId: 'bp-cli-human-gate',
+    goalId: 'goal-human-gate',
+    version: '1.0.0',
+    title: 'Human Gate CLI Test',
+    description: 'Testing approve and promote CLI commands',
+    nodes: [
+      {
+        nodeId: 'node-1',
+        contractId: 'contract-auth',
+        contractVersion: '1.0.0',
+        dependencies: [],
+        allowBranchFailure: false,
+        timeoutMs: 30000,
+        retryPolicy: { maxAttempts: 1, initialIntervalMs: 100, backoffCoefficient: 1, maximumIntervalMs: 100 },
+      },
+    ],
+  });
+
+const passHandler: NodeExecutionHandler = {
+  executeNode: async () => [
+    {
+      verdictId: 'v-node-1',
+      workflowId: 'wf-cli-test',
+      nodeId: 'node-1',
+      contractId: 'contract-auth',
+      contractVersion: '1.0.0',
+      gate: 'L0',
+      status: 'PASS',
+      sandboxPath: 'PATH_A_EPHEMERAL',
+      executionDurationMs: 50,
+      isAuthoritative: true,
+      errorDetails: [],
+      metrics: {},
+      evaluatedAt: new Date().toISOString(),
+    },
+  ],
+};
 
 describe('Fable CLI Commands & Integration Suite', () => {
   it('validates blueprint and contracts correctly for CLI validate command', () => {
@@ -90,5 +131,90 @@ describe('Fable CLI Commands & Integration Suite', () => {
     });
     expect(rec.precisionRatio).toBe(0.8);
     expect(rec.status).toBe('ACTIVE');
+  });
+
+  describe('Human Gate: Approve & Promote (CLI)', () => {
+    it('approveBlueprint transitions PENDING_APPROVAL -> RUNNING and records audit', () => {
+      const blueprint = testBlueprint();
+      const engine = new DAGEngine('wf-approve-01', blueprint, {
+        executeNode: async () => [],
+      });
+
+      expect(engine.getState().status).toBe('PENDING_APPROVAL');
+
+      engine.approveBlueprint({ approvedBy: 'lead-operator@synthos.dev' });
+
+      const state = engine.getState();
+      expect(state.status).toBe('RUNNING');
+      expect(state.approvedBy).toBe('lead-operator@synthos.dev');
+      expect(state.approvedAt).toBeDefined();
+
+      const approvalAudit = state.auditLog.find(e => e.eventType === 'DAG_APPROVAL_GRANTED');
+      expect(approvalAudit).toBeDefined();
+      expect(approvalAudit?.payload['approvedBy']).toBe('lead-operator@synthos.dev');
+    });
+
+    it('rejects approval when blueprint is not in PENDING_APPROVAL or STALE_PAUSED', () => {
+      const blueprint = testBlueprint();
+      const engine = new DAGEngine('wf-approve-02', blueprint, {
+        executeNode: async () => [],
+      });
+      engine.approveBlueprint({ approvedBy: 'operator' });
+
+      expect(() =>
+        engine.approveBlueprint({ approvedBy: 'operator' }),
+      ).toThrow(/Cannot approve blueprint/);
+    });
+
+    it('promoteRelease requires COMPLETED status and sets releasePromoted', async () => {
+      const blueprint = testBlueprint();
+      const engine = new DAGEngine('wf-promote-01', blueprint, passHandler);
+
+      // Cannot promote before completion
+      expect(() =>
+        engine.promoteRelease({
+          approvedBy: 'release-manager@synthos.dev',
+          targetEnvironment: 'PRODUCTION',
+        }),
+      ).toThrow(/Cannot promote release/);
+
+      // Approve and run to completion
+      engine.approveBlueprint({ approvedBy: 'lead-operator@synthos.dev' });
+      await engine.runUntilDone();
+      expect(engine.getState().status).toBe('COMPLETED');
+
+      // Now promote
+      engine.promoteRelease({
+        approvedBy: 'release-manager@synthos.dev',
+        targetEnvironment: 'PRODUCTION',
+      });
+
+      const state = engine.getState();
+      expect(state.releasePromoted).toBe(true);
+
+      const promoAudit = state.auditLog.find(e => e.eventType === 'RELEASE_PROMOTION_GRANTED');
+      expect(promoAudit).toBeDefined();
+      expect(promoAudit?.payload['targetEnvironment']).toBe('PRODUCTION');
+      expect(promoAudit?.payload['approvedBy']).toBe('release-manager@synthos.dev');
+    });
+
+    it('supports STAGING target environment for promotion', async () => {
+      const blueprint = testBlueprint();
+      const engine = new DAGEngine('wf-promote-02', blueprint, passHandler);
+
+      engine.approveBlueprint({ approvedBy: 'release-manager@synthos.dev' });
+      await engine.runUntilDone();
+
+      engine.promoteRelease({
+        approvedBy: 'release-manager@synthos.dev',
+        targetEnvironment: 'STAGING',
+      });
+
+      const state = engine.getState();
+      expect(state.releasePromoted).toBe(true);
+
+      const promoAudit = state.auditLog.find(e => e.eventType === 'RELEASE_PROMOTION_GRANTED');
+      expect(promoAudit?.payload['targetEnvironment']).toBe('STAGING');
+    });
   });
 });
