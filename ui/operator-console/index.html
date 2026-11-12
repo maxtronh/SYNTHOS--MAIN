@@ -9,11 +9,22 @@
 <body>
   <header>
     <div>
-      <h1>🏛️ Fable Engine v3 <span class="badge badge-info">Control Plane</span></h1>
-      <p class="subtitle">Durable Temporal DAGs • Human Gate SLAs • Dual Precision/Recall Telemetry</p>
+      <h1>🏛️ Fable Engine v3 <span class="badge badge-info" id="role-badge">Control Plane</span></h1>
+      <p class="subtitle">Durable Temporal DAGs • OPA Role-Based Views • Dual Precision/Recall Telemetry</p>
     </div>
-    <button class="btn-refresh" onclick="loadDashboard()">↻ Refresh State</button>
+    <div class="toolbar">
+      <label for="role-select" style="font-size:0.85rem;color:var(--muted);">SSO Role:</label>
+      <select id="role-select" onchange="onRoleChange()">
+        <option value="RELEASE_DIRECTOR">Release Director</option>
+        <option value="SENIOR_ENGINEER">Senior Engineer</option>
+        <option value="SECURITY_LEAD">Security Lead</option>
+        <option value="DEVELOPER">Developer (Read-Only Gates)</option>
+      </select>
+      <button class="btn-refresh" onclick="loadDashboard()">↻ Refresh State</button>
+    </div>
   </header>
+
+  <div id="rbac-banner" class="alert-banner"></div>
 
   <div class="grid" id="metrics-grid">
     <div class="card"><div class="metric-label">Total Workflows</div><div class="metric-val" id="m-wf-count">-</div></div>
@@ -22,7 +33,9 @@
     <div class="card"><div class="metric-label">P95 Pipeline Latency</div><div class="metric-val" id="m-p95">-</div></div>
   </div>
 
-  <div class="section-title">⚡ Active & Recent Workflows</div>
+  <div class="tabs" id="role-tabs"></div>
+
+  <div class="section-title" id="workflows-title">⚡ Active & Recent Workflows</div>
   <div id="workflows-container">Loading workflows...</div>
 
   <div class="section-title">📝 Escalated Decision Memos (3-Cycle Patch Cap)</div>

@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@fable/contracts": "*",
+    "@fable/governance-opa": "*",
     "@fable/orchestrator-temporal": "*"
   },
   "devDependencies": {

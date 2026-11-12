@@ -163,4 +163,73 @@ export class GcpSecretManagerBackend implements CloudSecretsBackend {
   }
 }
 
+export type VaultFetchFn = (url: string, init: RequestInit) => Promise<Response>;
+
+/**
+ * Live HashiCorp Vault KV v2 HTTP backend (P36).
+ * Communicates with Vault's REST API using X-Vault-Token header authentication.
+ */
+export class LiveVaultHttpSecretsBackend implements CloudSecretsBackend {
+  public readonly provider = 'hashicorp-vault-http';
+  private readonly baseUrl: string;
+  private readonly fetchFn: VaultFetchFn;
+
+  constructor(
+    vaultAddr: string,
+    private readonly vaultToken: string,
+    private readonly mountPath = 'secret',
+    options: { fetchFn?: VaultFetchFn } = {}
+  ) {
+    this.baseUrl = vaultAddr.replace(/\/+$/, '');
+    this.fetchFn = options.fetchFn ?? ((url, init) => fetch(url, init));
+  }
+
+  public async getSecret(secretPath: string): Promise<string | null> {
+    const res = await this.vaultRequest('GET', `/v1/${this.mountPath}/data/${secretPath}`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`Vault getSecret failed (${res.status})`);
+    const body = (await res.json()) as { data?: { data?: { value?: string } } };
+    return body.data?.data?.value ?? null;
+  }
+
+  public async setSecret(secretPath: string, value: string): Promise<void> {
+    const res = await this.vaultRequest('POST', `/v1/${this.mountPath}/data/${secretPath}`, {
+      data: { value },
+    });
+    if (!res.ok) throw new Error(`Vault setSecret failed (${res.status})`);
+  }
+
+  public async deleteSecret(secretPath: string): Promise<boolean> {
+    const res = await this.vaultRequest('DELETE', `/v1/${this.mountPath}/metadata/${secretPath}`);
+    return res.ok;
+  }
+
+  public async healthCheck(): Promise<boolean> {
+    try {
+      const res = await this.vaultRequest('GET', '/v1/sys/health');
+      return res.ok || res.status === 429 || res.status === 472;
+    } catch {
+      return false;
+    }
+  }
+
+  private async vaultRequest(
+    method: 'GET' | 'POST' | 'DELETE',
+    apiPath: string,
+    body?: Record<string, unknown>
+  ): Promise<Response> {
+    const init: RequestInit = {
+      method,
+      headers: {
+        'X-Vault-Token': this.vaultToken,
+        'Content-Type': 'application/json',
+      },
+    };
+    if (body !== undefined) {
+      init.body = JSON.stringify(body);
+    }
+    return this.fetchFn(`${this.baseUrl}${apiPath}`, init);
+  }
+}
+
 export type { SecretScope };

@@ -2,6 +2,11 @@ import fs from 'fs';
 import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import {
+  OpaPolicyEvaluator,
+  type GovernanceAction,
+  type OperatorPrincipal,
+} from '@fable/governance-opa';
 import { DashboardStateStore } from './store.js';
 import { renderOperatorConsoleHtml } from './ui-template.js';
 
@@ -74,11 +79,50 @@ export class OperatorDashboardServer {
           return;
         }
 
+        if (method === 'GET' && pathname === '/api/capabilities') {
+          const principal = this.parsePrincipalHeader(req);
+          const tenantId = principal?.tenantId ?? 'default';
+          const capabilities = principal
+            ? {
+                canApproveBlueprints: OpaPolicyEvaluator.evaluate({
+                  principal,
+                  action: 'APPROVE_BLUEPRINT',
+                  resourceTenantId: tenantId,
+                }).allowed,
+                canOverrideCriticalThreats: OpaPolicyEvaluator.evaluate({
+                  principal,
+                  action: 'OVERRIDE_CRITICAL_THREAT',
+                  resourceTenantId: tenantId,
+                }).allowed,
+                canResolveMemos: OpaPolicyEvaluator.evaluate({
+                  principal,
+                  action: 'RESOLVE_DECISION_MEMO',
+                  resourceTenantId: tenantId,
+                }).allowed,
+                canPromoteProduction: OpaPolicyEvaluator.evaluate({
+                  principal,
+                  action: 'PROMOTE_PRODUCTION',
+                  resourceTenantId: tenantId,
+                }).allowed,
+              }
+            : {
+                canApproveBlueprints: true,
+                canOverrideCriticalThreats: true,
+                canResolveMemos: true,
+                canPromoteProduction: true,
+              };
+
+          res.writeHead(200);
+          res.end(JSON.stringify({ principal, capabilities }));
+          return;
+        }
+
         // POST /api/workflows/:id/approve
         const approveMatch = /^\/api\/workflows\/([^/]+)\/approve$/.exec(pathname);
         if (method === 'POST' && approveMatch) {
           const workflowId = approveMatch[1]!;
           const body = await this.parseJsonBody(req);
+          if (!this.enforceOpaIfPresent(req, res, 'APPROVE_BLUEPRINT')) return;
           const approvedBy = typeof body['approvedBy'] === 'string' ? body['approvedBy'] : 'operator';
           const updated = this.store.approveWorkflow(workflowId, approvedBy);
           res.writeHead(200);
@@ -91,6 +135,8 @@ export class OperatorDashboardServer {
         if (method === 'POST' && promoteMatch) {
           const workflowId = promoteMatch[1]!;
           const body = await this.parseJsonBody(req);
+          const authorId = typeof body['authorId'] === 'string' ? body['authorId'] : undefined;
+          if (!this.enforceOpaIfPresent(req, res, 'PROMOTE_PRODUCTION', authorId)) return;
           const approvedBy = typeof body['approvedBy'] === 'string' ? body['approvedBy'] : 'release-manager';
           const targetEnv = body['targetEnvironment'] === 'STAGING' ? 'STAGING' : 'PRODUCTION';
           const updated = this.store.promoteWorkflowRelease(workflowId, approvedBy, targetEnv);
@@ -130,6 +176,41 @@ export class OperatorDashboardServer {
         else resolve();
       });
     });
+  }
+
+  private parsePrincipalHeader(req: http.IncomingMessage): OperatorPrincipal | null {
+    const raw = req.headers['x-fable-principal'];
+    if (typeof raw !== 'string' || !raw.trim()) return null;
+    try {
+      return JSON.parse(raw) as OperatorPrincipal;
+    } catch {
+      return null;
+    }
+  }
+
+  private enforceOpaIfPresent(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    action: GovernanceAction,
+    resourceAuthorId?: string
+  ): boolean {
+    const principal = this.parsePrincipalHeader(req);
+    if (!principal) return true;
+
+    const decision = OpaPolicyEvaluator.evaluate({
+      principal,
+      action,
+      resourceTenantId: principal.tenantId,
+      resourceAuthorId,
+    });
+
+    if (!decision.allowed) {
+      res.writeHead(403);
+      res.end(JSON.stringify({ error: 'Forbidden', reasons: decision.reasons }));
+      return false;
+    }
+
+    return true;
   }
 
   private serveStaticUiAsset(pathname: string, res: http.ServerResponse): void {

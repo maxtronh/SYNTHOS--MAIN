@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@fable/contracts": "*",
+    "@fable/governance-opa": "*",
     "@fable/ledger-telemetry": "*",
     "@fable/orchestrator-temporal": "*",
     "zod": "^3.24.1"

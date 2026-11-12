@@ -152,4 +152,147 @@ describe('Operator Dashboard & Human Review Server Suite (Phase 9)', () => {
     const promoteData = await promoteRes.json() as { workflow: { releasePromoted: boolean } };
     expect(promoteData.workflow.releasePromoted).toBe(true);
   });
+
+  it('enforces OPA RBAC & separation-of-duties on /api/capabilities, /approve, and /promote (Phase 40)', async () => {
+    const devPrincipal = {
+      subjectId: 'dev-1',
+      email: 'dev1@synthos.dev',
+      tenantId: 'default',
+      roles: ['DEVELOPER'],
+      ssoAuthenticated: true,
+    };
+    const seniorPrincipal = {
+      subjectId: 'senior-1',
+      email: 'senior1@synthos.dev',
+      tenantId: 'default',
+      roles: ['SENIOR_ENGINEER'],
+      ssoAuthenticated: true,
+    };
+    const directorPrincipal = {
+      subjectId: 'dir-1',
+      email: 'director1@synthos.dev',
+      tenantId: 'default',
+      roles: ['RELEASE_DIRECTOR'],
+      ssoAuthenticated: true,
+    };
+
+    const devCapsRes = await fetch(`http://localhost:${port}/api/capabilities`, {
+      headers: { 'x-fable-principal': JSON.stringify(devPrincipal) },
+    });
+    expect(devCapsRes.status).toBe(200);
+    const devCaps = await devCapsRes.json() as {
+      capabilities: { canApproveBlueprints: boolean; canPromoteProduction: boolean };
+    };
+    expect(devCaps.capabilities.canApproveBlueprints).toBe(false);
+    expect(devCaps.capabilities.canPromoteProduction).toBe(false);
+
+    const dirCapsRes = await fetch(`http://localhost:${port}/api/capabilities`, {
+      headers: { 'x-fable-principal': JSON.stringify(directorPrincipal) },
+    });
+    expect(dirCapsRes.status).toBe(200);
+    const dirCaps = await dirCapsRes.json() as {
+      capabilities: { canApproveBlueprints: boolean; canPromoteProduction: boolean };
+    };
+    expect(dirCaps.capabilities.canApproveBlueprints).toBe(true);
+    expect(dirCaps.capabilities.canPromoteProduction).toBe(true);
+
+    const rbacBlueprint: DAGBlueprint = {
+      blueprintId: 'bp-rbac-01',
+      goalId: 'goal-rbac',
+      version: '1.0.0',
+      title: 'RBAC Enforcement Flow',
+      description: 'Phase 40 OPA HTTP check',
+      status: 'DRAFT',
+      author: 'dev-other',
+      createdAt: new Date().toISOString(),
+      nodes: [
+        {
+          nodeId: 'node-rbac',
+          contractId: 'contract-rbac',
+          contractVersion: '1.0.0',
+          dependencies: [],
+          allowBranchFailure: false,
+          timeoutMs: 30000,
+          retryPolicy: { maxAttempts: 1, initialIntervalMs: 100, backoffCoefficient: 1, maximumIntervalMs: 100 },
+        },
+      ],
+    };
+    const rbacHandler: NodeExecutionHandler = {
+      executeNode: async (_wfId, nodeId, cId, cVer) => [
+        {
+          verdictId: `v-${nodeId}`,
+          workflowId: 'wf-rbac-200',
+          nodeId,
+          contractId: cId,
+          contractVersion: cVer,
+          gate: 'L0',
+          status: 'PASS',
+          sandboxPath: 'PATH_A_EPHEMERAL',
+          executionDurationMs: 50,
+          isAuthoritative: true,
+          errorDetails: [],
+          metrics: {},
+          evaluatedAt: new Date().toISOString(),
+        },
+      ],
+    };
+    const rbacEngine = new DAGEngine('wf-rbac-200', rbacBlueprint, rbacHandler);
+    store.registerWorkflow(rbacEngine);
+
+    const deniedApprove = await fetch(`http://localhost:${port}/api/workflows/wf-rbac-200/approve`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-fable-principal': JSON.stringify(devPrincipal),
+      },
+      body: JSON.stringify({ approvedBy: devPrincipal.email }),
+    });
+    expect(deniedApprove.status).toBe(403);
+    const deniedApproveJson = await deniedApprove.json() as { error: string; reasons: string[] };
+    expect(deniedApproveJson.error).toBe('Forbidden');
+    expect(deniedApproveJson.reasons.length).toBeGreaterThan(0);
+
+    const allowedApprove = await fetch(`http://localhost:${port}/api/workflows/wf-rbac-200/approve`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-fable-principal': JSON.stringify(seniorPrincipal),
+      },
+      body: JSON.stringify({ approvedBy: seniorPrincipal.email }),
+    });
+    expect(allowedApprove.status).toBe(200);
+    await rbacEngine.runUntilDone();
+
+    const deniedPromoteDev = await fetch(`http://localhost:${port}/api/workflows/wf-rbac-200/promote`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-fable-principal': JSON.stringify(devPrincipal),
+      },
+      body: JSON.stringify({ approvedBy: devPrincipal.email, authorId: 'dev-other', targetEnvironment: 'PRODUCTION' }),
+    });
+    expect(deniedPromoteDev.status).toBe(403);
+
+    const selfPromoteDenied = await fetch(`http://localhost:${port}/api/workflows/wf-rbac-200/promote`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-fable-principal': JSON.stringify(directorPrincipal),
+      },
+      body: JSON.stringify({ approvedBy: directorPrincipal.email, authorId: 'dir-1', targetEnvironment: 'PRODUCTION' }),
+    });
+    expect(selfPromoteDenied.status).toBe(403);
+
+    const allowedPromote = await fetch(`http://localhost:${port}/api/workflows/wf-rbac-200/promote`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-fable-principal': JSON.stringify(directorPrincipal),
+      },
+      body: JSON.stringify({ approvedBy: directorPrincipal.email, authorId: 'dev-other', targetEnvironment: 'PRODUCTION' }),
+    });
+    expect(allowedPromote.status).toBe(200);
+    const promoted = await allowedPromote.json() as { workflow: { releasePromoted: boolean } };
+    expect(promoted.workflow.releasePromoted).toBe(true);
+  });
 });

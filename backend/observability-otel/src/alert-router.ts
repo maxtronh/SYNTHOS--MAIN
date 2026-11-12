@@ -168,3 +168,93 @@ export class SlackAdapter implements AlertChannelAdapter {
   }
 }
 
+export type AlertFetchFn = (url: string, init: RequestInit) => Promise<Response>;
+
+async function postAlertJson(
+  url: string,
+  payload: Record<string, unknown>,
+  fetchFn: AlertFetchFn
+): Promise<void> {
+  const res = await fetchFn(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error(`Alert webhook delivery failed (${res.status}) for ${url}`);
+  }
+}
+
+/**
+ * Live PagerDuty Events API v2 HTTP adapter (P31/P36).
+ */
+export class PagerDutyHttpAdapter implements AlertChannelAdapter {
+  public readonly channel: AlertChannel = 'PAGERDUTY';
+  private readonly endpointUrl: string;
+  private readonly fetchFn: AlertFetchFn;
+
+  constructor(
+    private readonly integrationKey: string,
+    options: { endpointUrl?: string; fetchFn?: AlertFetchFn } = {}
+  ) {
+    this.endpointUrl = options.endpointUrl ?? 'https://events.pagerduty.com/v2/enqueue';
+    this.fetchFn = options.fetchFn ?? ((url, init) => fetch(url, init));
+  }
+
+  public async send(alert: AlertRecord): Promise<void> {
+    await postAlertJson(
+      this.endpointUrl,
+      {
+        routing_key: this.integrationKey,
+        event_action: 'trigger',
+        dedup_key: alert.alertId,
+        payload: {
+          summary: `[Fable SLO Alert] ${alert.service}: burnRate=${alert.burnRate.toFixed(2)}x (${alert.severity})`,
+          source: alert.service,
+          severity: alert.severity === 'CRITICAL_PAGE' ? 'critical' : 'warning',
+          custom_details: {
+            sloTargetAvailability: alert.sloTargetAvailability,
+            observedErrorRate: alert.observedErrorRate,
+            burnRate: alert.burnRate,
+          },
+        },
+      },
+      this.fetchFn
+    );
+  }
+}
+
+/**
+ * Live Slack Incoming Webhook HTTP adapter (P31/P36).
+ */
+export class SlackWebhookHttpAdapter implements AlertChannelAdapter {
+  public readonly channel: AlertChannel = 'SLACK';
+  private readonly fetchFn: AlertFetchFn;
+
+  constructor(
+    private readonly webhookUrl: string,
+    options: { fetchFn?: AlertFetchFn } = {}
+  ) {
+    this.fetchFn = options.fetchFn ?? ((url, init) => fetch(url, init));
+  }
+
+  public async send(alert: AlertRecord): Promise<void> {
+    await postAlertJson(
+      this.webhookUrl,
+      {
+        text: `*[Fable Engine v3]* ${alert.severity} on \`${alert.service}\` — Burn Rate: *${alert.burnRate.toFixed(2)}x*`,
+        blocks: [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `*${alert.severity}* alert for \`${alert.service}\`\n• Burn Rate: ${alert.burnRate.toFixed(2)}x\n• Observed Error Rate: ${(alert.observedErrorRate * 100).toFixed(3)}%`,
+            },
+          },
+        ],
+      },
+      this.fetchFn
+    );
+  }
+}
+
