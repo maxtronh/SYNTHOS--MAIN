@@ -4,11 +4,18 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import {
   OpaPolicyEvaluator,
+  SsoIdentityProvider,
   type GovernanceAction,
   type OperatorPrincipal,
 } from '@fable/governance-opa';
 import { DashboardStateStore } from './store.js';
 import { renderOperatorConsoleHtml } from './ui-template.js';
+
+export interface OperatorDashboardOptions {
+  requireAuth?: boolean | undefined;
+  ssoProvider?: SsoIdentityProvider | undefined;
+  ssoHmacSecret?: string | undefined;
+}
 
 const UI_CONSOLE_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -24,10 +31,12 @@ const UI_STATIC_MIME: Record<string, string> = {
 
 export class OperatorDashboardServer {
   private readonly store: DashboardStateStore;
+  private readonly options: OperatorDashboardOptions;
   private server: http.Server | null = null;
 
-  constructor(store?: DashboardStateStore) {
+  constructor(store?: DashboardStateStore, options?: OperatorDashboardOptions) {
     this.store = store ?? new DashboardStateStore();
+    this.options = options ?? {};
   }
 
   public getStore(): DashboardStateStore {
@@ -80,7 +89,9 @@ export class OperatorDashboardServer {
         }
 
         if (method === 'GET' && pathname === '/api/capabilities') {
-          const principal = this.parsePrincipalHeader(req);
+          const auth = this.authenticatePrincipal(req, res);
+          if (!auth.ok) return;
+          const principal = auth.principal;
           const tenantId = principal?.tenantId ?? 'default';
           const capabilities = principal
             ? {
@@ -135,7 +146,9 @@ export class OperatorDashboardServer {
         if (method === 'POST' && promoteMatch) {
           const workflowId = promoteMatch[1]!;
           const body = await this.parseJsonBody(req);
-          const authorId = typeof body['authorId'] === 'string' ? body['authorId'] : undefined;
+          const persistedAuthor = this.store.getWorkflowAuthor(workflowId);
+          const authorId =
+            persistedAuthor ?? (typeof body['authorId'] === 'string' ? body['authorId'] : undefined);
           if (!this.enforceOpaIfPresent(req, res, 'PROMOTE_PRODUCTION', authorId)) return;
           const approvedBy = typeof body['approvedBy'] === 'string' ? body['approvedBy'] : 'release-manager';
           const targetEnv = body['targetEnvironment'] === 'STAGING' ? 'STAGING' : 'PRODUCTION';
@@ -178,6 +191,50 @@ export class OperatorDashboardServer {
     });
   }
 
+  private authenticatePrincipal(
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+  ): { ok: true; principal: OperatorPrincipal | null } | { ok: false } {
+    const authHeader = req.headers['authorization'];
+    if (typeof authHeader === 'string' && authHeader.toLowerCase().startsWith('bearer ')) {
+      const token = authHeader.slice(7).trim();
+      if (!this.options.ssoProvider || !this.options.ssoHmacSecret) {
+        res.writeHead(401);
+        res.end(
+          JSON.stringify({
+            error: 'Unauthorized',
+            reasons: ['SSO token verification is not configured on this server.'],
+          })
+        );
+        return { ok: false };
+      }
+      try {
+        const principal = this.options.ssoProvider.verifySignedToken(
+          token,
+          this.options.ssoHmacSecret
+        );
+        return { ok: true, principal };
+      } catch (err) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Unauthorized', reasons: [(err as Error).message] }));
+        return { ok: false };
+      }
+    }
+
+    if (this.options.requireAuth) {
+      res.writeHead(401);
+      res.end(
+        JSON.stringify({
+          error: 'Unauthorized',
+          reasons: ['Signed SSO Bearer token required.'],
+        })
+      );
+      return { ok: false };
+    }
+
+    return { ok: true, principal: this.parsePrincipalHeader(req) };
+  }
+
   private parsePrincipalHeader(req: http.IncomingMessage): OperatorPrincipal | null {
     const raw = req.headers['x-fable-principal'];
     if (typeof raw !== 'string' || !raw.trim()) return null;
@@ -194,13 +251,14 @@ export class OperatorDashboardServer {
     action: GovernanceAction,
     resourceAuthorId?: string
   ): boolean {
-    const principal = this.parsePrincipalHeader(req);
-    if (!principal) return true;
+    const auth = this.authenticatePrincipal(req, res);
+    if (!auth.ok) return false;
+    if (!auth.principal) return true;
 
     const decision = OpaPolicyEvaluator.evaluate({
-      principal,
+      principal: auth.principal,
       action,
-      resourceTenantId: principal.tenantId,
+      resourceTenantId: auth.principal.tenantId,
       resourceAuthorId,
     });
 

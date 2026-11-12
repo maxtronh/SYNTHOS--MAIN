@@ -33,7 +33,7 @@ describe('Phase 3: Cloud Secrets Backend Integration', () => {
     }
   }
 
-  it('VaultSecretsBackend exposes provider name and method signatures', () => {
+  it('VaultSecretsBackend exposes provider name and method signatures', async () => {
     const vault = new VaultSecretsBackend(
       'https://vault.example.com:8200',
       'root-token',
@@ -41,30 +41,30 @@ describe('Phase 3: Cloud Secrets Backend Integration', () => {
     );
 
     expect(vault.provider).toBe('hashicorp-vault');
-    expect(vault.getSecret('fable/prod/db-password')).resolves.toBeNull();
-    expect(vault.setSecret('fable/prod/db-password', 's3cr3t')).resolves.toBeUndefined();
-    expect(vault.deleteSecret('fable/prod/db-password')).resolves.toBe(false);
-    expect(vault.healthCheck()).resolves.toBe(false);
+    await expect(vault.getSecret('fable/prod/db-password')).resolves.toBeNull();
+    await expect(vault.setSecret('fable/prod/db-password', 's3cr3t')).resolves.toBeUndefined();
+    await expect(vault.deleteSecret('fable/prod/db-password')).resolves.toBe(false);
+    await expect(vault.healthCheck()).resolves.toBe(false);
   });
 
-  it('AwsSecretsManagerBackend exposes provider name and method signatures', () => {
+  it('AwsSecretsManagerBackend exposes provider name and method signatures', async () => {
     const aws = new AwsSecretsManagerBackend('us-east-1', 'fable/secrets');
 
     expect(aws.provider).toBe('aws-secrets-manager');
-    expect(aws.getSecret('db-password')).resolves.toBeNull();
-    expect(aws.setSecret('db-password', 's3cr3t')).resolves.toBeUndefined();
-    expect(aws.deleteSecret('db-password')).resolves.toBe(false);
-    expect(aws.healthCheck()).resolves.toBe(false);
+    await expect(aws.getSecret('db-password')).resolves.toBeNull();
+    await expect(aws.setSecret('db-password', 's3cr3t')).resolves.toBeUndefined();
+    await expect(aws.deleteSecret('db-password')).resolves.toBe(false);
+    await expect(aws.healthCheck()).resolves.toBe(false);
   });
 
-  it('GcpSecretManagerBackend exposes provider name and method signatures', () => {
+  it('GcpSecretManagerBackend exposes provider name and method signatures', async () => {
     const gcp = new GcpSecretManagerBackend('my-project', 'fable/secrets');
 
     expect(gcp.provider).toBe('gcp-secret-manager');
-    expect(gcp.getSecret('db-password')).resolves.toBeNull();
-    expect(gcp.setSecret('db-password', 's3cr3t')).resolves.toBeUndefined();
-    expect(gcp.deleteSecret('db-password')).resolves.toBe(false);
-    expect(gcp.healthCheck()).resolves.toBe(false);
+    await expect(gcp.getSecret('db-password')).resolves.toBeNull();
+    await expect(gcp.setSecret('db-password', 's3cr3t')).resolves.toBeUndefined();
+    await expect(gcp.deleteSecret('db-password')).resolves.toBe(false);
+    await expect(gcp.healthCheck()).resolves.toBe(false);
   });
 
   it('backends are interchangeable through the CloudSecretsBackend interface', async () => {

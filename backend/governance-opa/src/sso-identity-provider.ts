@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import type { OperatorPrincipal, OperatorRole } from './policy-engine.js';
 
 /**
@@ -82,6 +83,58 @@ export class SsoIdentityProvider {
       .filter((r): r is string => typeof r === 'string')
       .filter(r => knownRoles.has(r.toUpperCase()))
       .map(r => r.toUpperCase() as OperatorRole);
+  }
+
+  /**
+   * Verify an HS256-signed compact JWT token (`header.payload.signature`) using
+   * constant-time signature comparison, then authenticate its decoded claims.
+   */
+  public verifySignedToken(
+    token: string,
+    hmacSecret: string,
+    nowMs: number = Date.now()
+  ): OperatorPrincipal {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      throw new Error('SSO Authentication Failed: malformed compact JWT.');
+    }
+    const [encodedHeader, encodedPayload, encodedSig] = parts as [string, string, string];
+    const signingInput = `${encodedHeader}.${encodedPayload}`;
+    const expectedSig = crypto
+      .createHmac('sha256', hmacSecret)
+      .update(signingInput)
+      .digest('base64url');
+
+    const providedBuf = Buffer.from(encodedSig, 'utf8');
+    const expectedBuf = Buffer.from(expectedSig, 'utf8');
+    if (
+      providedBuf.length !== expectedBuf.length ||
+      !crypto.timingSafeEqual(providedBuf, expectedBuf)
+    ) {
+      throw new Error('SSO Authentication Failed: invalid JWT signature.');
+    }
+
+    const claims = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8')) as Record<
+      string,
+      unknown
+    >;
+    return this.authenticate(claims, nowMs);
+  }
+
+  /**
+   * Issue an HS256-signed compact JWT for testing and local signed SSO flows.
+   */
+  public static issueSignedToken(
+    claims: Record<string, unknown>,
+    hmacSecret: string
+  ): string {
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+    const payload = Buffer.from(JSON.stringify(claims)).toString('base64url');
+    const signature = crypto
+      .createHmac('sha256', hmacSecret)
+      .update(`${header}.${payload}`)
+      .digest('base64url');
+    return `${header}.${payload}.${signature}`;
   }
 
   /**

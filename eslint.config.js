@@ -31,8 +31,18 @@ export default tseslint.config(
   {
     // JavaScript / ESM files — no TypeScript project needed
     files: ['**/*.mjs', '**/*.js'],
+    ignores: ['ui/**/*.js'],
     languageOptions: {
       ...sharedLanguageOptions,
+    },
+  },
+  {
+    // Browser UI script files served statically by the Operator Control Plane
+    files: ['ui/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'script',
+      globals: { ...globals.browser, ...globals.es2022 },
     },
   },
   {

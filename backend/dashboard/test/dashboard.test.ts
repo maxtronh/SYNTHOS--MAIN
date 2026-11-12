@@ -1,5 +1,6 @@
 import { describe, it, expect, afterAll, beforeAll } from 'vitest';
 import type { DAGBlueprint } from '@fable/contracts';
+import { SsoIdentityProvider } from '@fable/governance-opa';
 import { DAGEngine, type NodeExecutionHandler } from '@fable/orchestrator-temporal';
 import { OperatorDashboardServer, DashboardStateStore } from '../src/index.js';
 
@@ -273,13 +274,52 @@ describe('Operator Dashboard & Human Review Server Suite (Phase 9)', () => {
     });
     expect(deniedPromoteDev.status).toBe(403);
 
-    const selfPromoteDenied = await fetch(`http://localhost:${port}/api/workflows/wf-rbac-200/promote`, {
+    // Register a workflow authored by dir-1 to prove server-side author lookup prevents body spoofing
+    const selfAuthoredEngine = new DAGEngine(
+      'wf-self-201',
+      { ...rbacBlueprint, blueprintId: 'bp-self-01', author: 'dir-1' },
+      {
+        executeNode: async (_wfId, nodeId, cId, cVer) => [
+          {
+            verdictId: `v-self-${nodeId}`,
+            workflowId: 'wf-self-201',
+            nodeId,
+            contractId: cId,
+            contractVersion: cVer,
+            gate: 'L0',
+            status: 'PASS',
+            sandboxPath: 'PATH_A_EPHEMERAL',
+            executionDurationMs: 25,
+            isAuthoritative: true,
+            errorDetails: [],
+            metrics: {},
+            evaluatedAt: new Date().toISOString(),
+          },
+        ],
+      }
+    );
+    store.registerWorkflow(selfAuthoredEngine);
+    await fetch(`http://localhost:${port}/api/workflows/wf-self-201/approve`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-fable-principal': JSON.stringify(seniorPrincipal),
+      },
+      body: JSON.stringify({ approvedBy: seniorPrincipal.email }),
+    });
+    await selfAuthoredEngine.runUntilDone();
+
+    const selfPromoteDenied = await fetch(`http://localhost:${port}/api/workflows/wf-self-201/promote`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-fable-principal': JSON.stringify(directorPrincipal),
       },
-      body: JSON.stringify({ approvedBy: directorPrincipal.email, authorId: 'dir-1', targetEnvironment: 'PRODUCTION' }),
+      body: JSON.stringify({
+        approvedBy: directorPrincipal.email,
+        authorId: 'spoofed-other-author',
+        targetEnvironment: 'PRODUCTION',
+      }),
     });
     expect(selfPromoteDenied.status).toBe(403);
 
@@ -289,10 +329,116 @@ describe('Operator Dashboard & Human Review Server Suite (Phase 9)', () => {
         'Content-Type': 'application/json',
         'x-fable-principal': JSON.stringify(directorPrincipal),
       },
-      body: JSON.stringify({ approvedBy: directorPrincipal.email, authorId: 'dev-other', targetEnvironment: 'PRODUCTION' }),
+      body: JSON.stringify({ approvedBy: directorPrincipal.email, targetEnvironment: 'PRODUCTION' }),
     });
     expect(allowedPromote.status).toBe(200);
     const promoted = await allowedPromote.json() as { workflow: { releasePromoted: boolean } };
     expect(promoted.workflow.releasePromoted).toBe(true);
+  });
+
+  it('enforces signed Bearer JWT authentication when requireAuth is enabled', async () => {
+    const hmacSecret = 'dashboard-strict-hmac-secret-key';
+    const ssoProvider = new SsoIdentityProvider({
+      issuer: 'https://idp.example.com',
+      audience: 'fable-engine-v3',
+    });
+    const strictStore = new DashboardStateStore();
+    const strictServer = new OperatorDashboardServer(strictStore, {
+      requireAuth: true,
+      ssoProvider,
+      ssoHmacSecret: hmacSecret,
+    });
+    const strictPort = await strictServer.start(0);
+
+    try {
+      const strictBp: DAGBlueprint = {
+        blueprintId: 'bp-strict-01',
+        goalId: 'goal-strict',
+        version: '1.0.0',
+        title: 'Strict Auth Flow',
+        description: 'Requires signed Bearer JWT',
+        status: 'DRAFT',
+        author: 'dev-1',
+        createdAt: new Date().toISOString(),
+        nodes: [
+          {
+            nodeId: 'n1',
+            contractId: 'c1',
+            contractVersion: '1.0.0',
+            dependencies: [],
+            allowBranchFailure: false,
+            timeoutMs: 10000,
+            retryPolicy: { maxAttempts: 1, initialIntervalMs: 100, backoffCoefficient: 1, maximumIntervalMs: 100 },
+          },
+        ],
+      };
+      strictStore.registerWorkflow(
+        new DAGEngine('wf-strict-1', strictBp, {
+          executeNode: async () => [],
+        })
+      );
+
+      // 1. Missing credentials -> 401
+      const noAuthRes = await fetch(`http://localhost:${strictPort}/api/capabilities`);
+      expect(noAuthRes.status).toBe(401);
+
+      // 2. Unsigned x-fable-principal header rejected in requireAuth mode -> 401
+      const unsignedRes = await fetch(`http://localhost:${strictPort}/api/workflows/wf-strict-1/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-fable-principal': JSON.stringify({
+            subjectId: 'spoof',
+            email: 'spoof@example.com',
+            tenantId: 'default',
+            roles: ['RELEASE_DIRECTOR'],
+            ssoAuthenticated: true,
+          }),
+        },
+        body: JSON.stringify({ approvedBy: 'spoof@example.com' }),
+      });
+      expect(unsignedRes.status).toBe(401);
+
+      // 3. Invalid Bearer signature -> 401
+      const badToken = SsoIdentityProvider.issueSignedToken(
+        SsoIdentityProvider.mockAssertion({ sub: 'sr-1', roles: ['SENIOR_ENGINEER'] }),
+        'wrong-secret'
+      );
+      const badJwtRes = await fetch(`http://localhost:${strictPort}/api/capabilities`, {
+        headers: { Authorization: `Bearer ${badToken}` },
+      });
+      expect(badJwtRes.status).toBe(401);
+
+      // 4. Valid signed Bearer JWT -> 200
+      const validToken = SsoIdentityProvider.issueSignedToken(
+        SsoIdentityProvider.mockAssertion({
+          sub: 'sr-1',
+          email: 'sr@example.com',
+          roles: ['SENIOR_ENGINEER'],
+        }),
+        hmacSecret
+      );
+      const capsRes = await fetch(`http://localhost:${strictPort}/api/capabilities`, {
+        headers: { Authorization: `Bearer ${validToken}` },
+      });
+      expect(capsRes.status).toBe(200);
+      const capsJson = await capsRes.json() as {
+        capabilities: { canApproveBlueprints: boolean; canPromoteProduction: boolean };
+      };
+      expect(capsJson.capabilities.canApproveBlueprints).toBe(true);
+      expect(capsJson.capabilities.canPromoteProduction).toBe(false);
+
+      const okApprove = await fetch(`http://localhost:${strictPort}/api/workflows/wf-strict-1/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${validToken}`,
+        },
+        body: JSON.stringify({ approvedBy: 'sr@example.com' }),
+      });
+      expect(okApprove.status).toBe(200);
+    } finally {
+      await strictServer.stop();
+    }
   });
 });

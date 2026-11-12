@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - "wave-*"
+      - "phase-*"
   pull_request:
     branches:
       - main

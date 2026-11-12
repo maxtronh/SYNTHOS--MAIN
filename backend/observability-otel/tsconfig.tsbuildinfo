@@ -1,1 +1,1 @@
-{"root":["./src/alert-router.ts","./src/index.ts","./src/slo-evaluator.ts","./src/trace-context.ts","./src/tracer.ts","./src/types.ts"],"version":"5.9.3"}
+{"root":["./src/alert-router.ts","./src/index.ts","./src/slo-alert-watcher.ts","./src/slo-evaluator.ts","./src/trace-context.ts","./src/tracer.ts","./src/types.ts"],"version":"5.9.3"}

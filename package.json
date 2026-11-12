@@ -12,7 +12,7 @@
     "build": "node scripts/build-workspaces.mjs",
     "test": "npm run test --workspaces --if-present",
     "test:acceptance": "vitest run test/acceptance",
-    "lint": "eslint backend frontend scripts test",
+    "lint": "eslint backend frontend ui scripts test",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {

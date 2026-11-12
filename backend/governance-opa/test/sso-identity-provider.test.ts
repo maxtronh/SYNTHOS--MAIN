@@ -123,4 +123,24 @@ describe('Phase 3: SSO / OIDC Identity Provider Integration', () => {
     expect(principal.roles).toContain('SENIOR_ENGINEER');
     expect(principal.ssoAuthenticated).toBe(true);
   });
+
+  it('verifies HS256-signed JWT tokens and rejects tampered signatures', () => {
+    const secret = 'test-hmac-secret-32-chars-minimum!';
+    const token = SsoIdentityProvider.issueSignedToken(
+      SsoIdentityProvider.mockAssertion({
+        sub: 'usr-jwt-1',
+        roles: ['RELEASE_DIRECTOR'],
+      }),
+      secret
+    );
+
+    const verified = idp.verifySignedToken(token, secret);
+    expect(verified.subjectId).toBe('usr-jwt-1');
+    expect(verified.roles).toEqual(['RELEASE_DIRECTOR']);
+
+    const parts = token.split('.');
+    const tampered = `${parts[0]}.${parts[1]}.tampered_signature`;
+    expect(() => idp.verifySignedToken(tampered, secret)).toThrow(/signature/);
+    expect(() => idp.verifySignedToken('not-a-jwt', secret)).toThrow(/malformed/);
+  });
 });

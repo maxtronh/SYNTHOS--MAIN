@@ -2,7 +2,7 @@
 
 > **Deterministic, Tool-First Software Verification & Durable DAG Orchestration Platform**
 
-Fable Engine v3 replaces legacy unconstrained voting swarms with a deterministic, tool-first verification pipeline featuring durable Temporal workflow orchestration, hardware-isolated MicroVM & stateful sandboxes, eBPF runtime auditing, Ed25519 SLSA provenance, AST code retrieval, cross-repo blast-radius invalidation, and dual-ledger telemetry across **29 implemented phases**.
+Fable Engine v3 replaces legacy unconstrained voting swarms with a deterministic, tool-first verification pipeline featuring durable Temporal workflow orchestration, hardware-isolated MicroVM & stateful sandboxes, eBPF runtime auditing, Ed25519 SLSA provenance, AST code retrieval, cross-repo blast-radius invalidation, and dual-ledger telemetry across **40 implemented phases** (Foundation + Waves 1–5).
 
 ---
 
@@ -58,7 +58,7 @@ All visual system architectures, sequence flows, security boundaries, and wave e
 | [`@fable/canary-rollout`](backend/canary-rollout) | `backend/canary-rollout` | Progressive canary traffic shifter and automated SLO-triggered rollback controller guarded by SLSA signatures. |
 | [`@fable/gitops-pr-bot`](backend/gitops-pr-bot) | `backend/gitops-pr-bot` | Bidirectional GitHub/GitLab webhook verifier and Mermaid DAG PR Check Run formatter. |
 | [`@fable/dashboard`](backend/dashboard) | `backend/dashboard` | Live Operator Control Plane HTTP server serving [`ui/operator-console`](ui/operator-console) and REST APIs. |
-| [`@fable/cli`](backend/cli) | `backend/cli` | Fable Developer & Operator CLI (`validate`, `adapter`, `run`, `blast-radius`, `telemetry`, `dashboard`). |
+| [`@fable/cli`](backend/cli) | `backend/cli` | Fable Developer & Operator CLI (`validate`, `adapter`, `run`, `approve`, `promote`, `drift-detect`, `blast-radius`, `telemetry`, `dashboard`). |
 
 ---
 

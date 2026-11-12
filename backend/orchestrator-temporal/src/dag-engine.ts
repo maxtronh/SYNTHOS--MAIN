@@ -66,6 +66,10 @@ export class DAGEngine {
     return this.state;
   }
 
+  public getBlueprint(): Readonly<DAGBlueprint> {
+    return this.blueprint;
+  }
+
   /**
    * Signal: Human approves blueprint
    */

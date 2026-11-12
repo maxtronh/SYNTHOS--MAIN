@@ -32,6 +32,10 @@ export class DashboardStateStore {
     return this.workflows.get(workflowId);
   }
 
+  public getWorkflowAuthor(workflowId: string): string | undefined {
+    return this.workflows.get(workflowId)?.getBlueprint().author;
+  }
+
   public listWorkflowStates(): WorkflowProgressState[] {
     return Array.from(this.workflows.values()).map(w => w.getState() as WorkflowProgressState);
   }
