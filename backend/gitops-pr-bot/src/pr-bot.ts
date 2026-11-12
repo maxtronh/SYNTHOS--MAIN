@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import type { DAGBlueprint, DecisionMemo } from '@fable/contracts';
 import type { WorkflowProgressState } from '@fable/orchestrator-temporal';
+import type { DriftReport } from '@fable/scip-graph';
 import type { CheckRunConclusion, GitHubCheckRunOutput, PullRequestEventPayload } from './types.js';
 
 const STATUS_TO_CONCLUSION: Record<WorkflowProgressState['status'], CheckRunConclusion> = {
@@ -78,6 +79,49 @@ export class GitOpsPullRequestBot {
 
     return {
       name: 'Fable Engine v3 Deterministic Verification',
+      headSha,
+      conclusion,
+      summaryMarkdown,
+      mermaidDag,
+    };
+  }
+
+  /**
+   * Formats a cross-repo SCIP drift pre-alert as a GitHub Check Run report (Phase 35).
+   */
+  public static buildDriftPreAlertCheckRun(
+    headSha: string,
+    report: DriftReport
+  ): GitHubCheckRunOutput {
+    const conclusion: CheckRunConclusion = report.hasBreakingDrift
+      ? 'failure'
+      : (report.findings.length > 0 ? 'action_required' : 'success');
+
+    const findingsList = report.findings.length === 0
+      ? '- No cross-repo contract or SCIP symbol drift detected.'
+      : report.findings
+          .map(f => `- **[${f.severity}]** \`${f.category}\` — ${f.detail}`)
+          .join('\n');
+
+    const mermaidLines = ['flowchart LR'];
+    for (const unit of report.impactedTransitiveUnits) {
+      mermaidLines.push(`  Drift["Breaking Drift"] --> ${unit.replace(/[^a-zA-Z0-9_]/g, '_')}["${unit}"]`);
+    }
+    const mermaidDag = mermaidLines.join('\n');
+
+    const summaryMarkdown = [
+      `## Fable Engine v3 — Cross-Repo SCIP Drift Report`,
+      `**Breaking Drift:** \`${report.hasBreakingDrift}\` | **Findings:** \`${report.findings.length}\``,
+      ``,
+      `### Findings`,
+      findingsList,
+      ``,
+      `### Impacted Transitive Units`,
+      report.impactedTransitiveUnits.map(u => `- \`${u}\``).join('\n') || '- None',
+    ].join('\n');
+
+    return {
+      name: 'Fable Engine v3 Cross-Repo Drift Pre-Alert',
       headSha,
       conclusion,
       summaryMarkdown,

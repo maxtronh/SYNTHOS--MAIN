@@ -1,0 +1,40 @@
+{
+  "blueprintId": "bp-sample-01",
+  "goalId": "goal-ecommerce-payment",
+  "version": "1.0.0",
+  "title": "Payment Processing Pipeline",
+  "description": "Sample DAG for validating auth -> payment flow",
+  "status": "DRAFT",
+  "author": "developer",
+  "createdAt": "2026-11-12T00:00:00.000Z",
+  "nodes": [
+    {
+      "nodeId": "node-auth",
+      "contractId": "contract-auth-service",
+      "contractVersion": "1.0.0",
+      "dependencies": [],
+      "allowBranchFailure": false,
+      "timeoutMs": 30000,
+      "retryPolicy": {
+        "maxAttempts": 3,
+        "initialIntervalMs": 100,
+        "backoffCoefficient": 2,
+        "maximumIntervalMs": 1000
+      }
+    },
+    {
+      "nodeId": "node-payment",
+      "contractId": "contract-payment-service",
+      "contractVersion": "1.0.0",
+      "dependencies": ["node-auth"],
+      "allowBranchFailure": false,
+      "timeoutMs": 60000,
+      "retryPolicy": {
+        "maxAttempts": 3,
+        "initialIntervalMs": 100,
+        "backoffCoefficient": 2,
+        "maximumIntervalMs": 1000
+      }
+    }
+  ]
+}

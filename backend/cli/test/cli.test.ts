@@ -8,6 +8,7 @@ import { DeterministicAdapterBuilder } from '@fable/builder-deterministic';
 import { GraphResolver, BlastRadiusDispatcher } from '@fable/blast-radius-resolver';
 import { PrecisionLedger } from '@fable/ledger-telemetry';
 import { DAGEngine, type NodeExecutionHandler } from '@fable/orchestrator-temporal';
+import { DriftDetector } from '@fable/scip-graph';
 
 const testBlueprint = () =>
   DAGBlueprintSchema.parse({
@@ -215,6 +216,16 @@ describe('Fable CLI Commands & Integration Suite', () => {
 
       const promoAudit = state.auditLog.find(e => e.eventType === 'RELEASE_PROMOTION_GRANTED');
       expect(promoAudit?.payload['targetEnvironment']).toBe('STAGING');
+    });
+
+    it('detects breaking drift across contracts for CLI drift-detect command', () => {
+      const report = DriftDetector.detectDrift({
+        publishedContracts: [{ contractId: 'c-auth', version: '2.0.0' }],
+        consumerPins: [{ consumerUnitId: 'orders', contractId: 'c-auth', pinnedVersion: '1.0.0' }],
+      });
+
+      expect(report.hasBreakingDrift).toBe(true);
+      expect(report.findings[0]?.category).toBe('MAJOR_VERSION_DRIFT');
     });
   });
 });

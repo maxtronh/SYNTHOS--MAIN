@@ -23,6 +23,7 @@
     "@fable/llm-gateway": "*",
     "@fable/orchestrator-temporal": "*",
     "@fable/retrieval-pgvector": "*",
+    "@fable/scip-graph": "*",
     "@fable/worker-bridge": "*",
     "commander": "^12.1.0"
   },

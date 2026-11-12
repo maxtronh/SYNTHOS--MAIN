@@ -78,3 +78,18 @@ This directory contains the complete visual architecture of **Fable Engine v3** 
 * **Zero False Negatives**: `ScipSemanticGraph` translates compiler symbol references across repositories into transitive `DependencyEdge` paths for `GraphResolver`.
 * **Priority Preemption**: `MAJOR` contract bumps preempt background tasks as `CRITICAL` jobs via `PriorityQueueRouter` and `TemporalBullMQBridge` while holding release eligibility until downstream `PASS`.
 * **Golden Regression Lock**: Any production escape recorded in `RecallLedger` is compiled into a permanent deterministic `L1a` Vitest guard via `GoldenRegressionGenerator`.
+
+---
+
+## 6. Wave 5 Production Readiness & Integrations Roadmap (`Phases 30–40`)
+
+* **Mermaid Sources**: [`06-wave-5-production-roadmap.mmd`](diagrams/06-wave-5-production-roadmap.mmd) | [`04-wave-5-roadmap.mmd`](diagrams/04-wave-5-roadmap.mmd)
+* **Rendered Images**: [`PNG`](images/06-wave-5-production-roadmap.png) | [`SVG`](images/06-wave-5-production-roadmap.svg)
+
+![Wave 5 Production Roadmap](images/06-wave-5-production-roadmap.png)
+
+### Roadmap Explanation
+* **Wave 4.5 (Pre-Prod Decisions)**: Resolves Temporal HA / PG PITR, BullMQ DLQ reconciliation, L3 catalog, sandbox quotas, retrieval bounds, concrete SLOs, ledger adjudication, and named approvers ([`production-readiness-decisions.md`](../docs/fable-engine-v3/production-readiness-decisions.md)).
+* **Wave 5A (`P30–P33`)**: Enforces CI gates, OTel alerting, OIDC SSO + OPA RBAC, and `fable approve / promote / drift-detect` CLI ops.
+* **Wave 5B (`P34–P38`)**: Deploys multi-region SLSA-guarded canary rollouts, cross-repo SCIP drift pre-alerts, Vault/cloud secrets, and executable DR game-day drills.
+* **Wave 5C (`P39–P40`)**: Adds versioned LLM model registry & persona governance plus a role-based React Operator Console.

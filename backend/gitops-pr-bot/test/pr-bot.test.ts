@@ -68,4 +68,27 @@ describe('Phase 17: GitOps PR Bot Suite', () => {
     expect(report.mermaidDag).toContain('node-auth --> node-billing');
     expect(report.summaryMarkdown).toContain('```mermaid');
   });
+
+  it('Phase 35: formats cross-repo drift pre-alert check runs cleanly', () => {
+    const checkRun = GitOpsPullRequestBot.buildDriftPreAlertCheckRun('deadbeef', {
+      hasBreakingDrift: true,
+      findings: [
+        {
+          category: 'MAJOR_VERSION_DRIFT',
+          severity: 'BREAKING',
+          consumerUnitId: 'orders/api',
+          contractId: 'c-auth',
+          pinnedVersion: '1.0.0',
+          latestVersion: '2.0.0',
+          detail: 'orders/api lags c-auth@2.0.0',
+        },
+      ],
+      impactedTransitiveUnits: ['billing/worker', 'orders/api'],
+      evaluatedAt: new Date().toISOString(),
+    });
+
+    expect(checkRun.conclusion).toBe('failure');
+    expect(checkRun.summaryMarkdown).toContain('MAJOR_VERSION_DRIFT');
+    expect(checkRun.mermaidDag).toContain('orders_api["orders/api"]');
+  });
 });

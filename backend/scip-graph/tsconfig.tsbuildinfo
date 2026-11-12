@@ -1,1 +1,1 @@
-{"root":["./src/index.ts","./src/scip-indexer.ts"],"version":"5.9.3"}
+{"root":["./src/drift-detector.ts","./src/index.ts","./src/scip-indexer.ts"],"version":"5.9.3"}

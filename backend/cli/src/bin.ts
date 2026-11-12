@@ -19,6 +19,11 @@ import { GateRunner } from '@fable/gate-runner';
 import { GraphResolver, BlastRadiusDispatcher } from '@fable/blast-radius-resolver';
 import { PrecisionLedger, RecallLedger, OperationalMetricsTracker } from '@fable/ledger-telemetry';
 import { OperatorDashboardServer } from '@fable/dashboard';
+import {
+  DriftDetector,
+  type PublishedContractRecord,
+  type ConsumerPinRecord,
+} from '@fable/scip-graph';
 
 const program = new Command();
 
@@ -322,7 +327,7 @@ program
       console.log(`Status: ${state.status}`);
       console.log(`Approved By: ${state.approvedBy ?? 'N/A'}`);
       console.log(`Approved At: ${state.approvedAt ?? 'N/A'}`);
-      console.log(`Nodes: ${state.nodeStates.length} registered, awaiting execution`);
+      console.log(`Nodes: ${Object.keys(state.nodeStates).length} registered, awaiting execution`);
 
       if (state.status === 'RUNNING') {
         console.log('\nBlueprint approved. Use `fable run` or the dashboard to execute DAG nodes.');
@@ -352,7 +357,7 @@ program
     'Target environment: PRODUCTION or STAGING',
     'PRODUCTION',
   )
-  .action((blueprintPath, options) => {
+  .action(async (blueprintPath, options) => {
     try {
       const fullBpPath = path.resolve(process.cwd(), blueprintPath);
       if (!fs.existsSync(fullBpPath)) {
@@ -388,7 +393,7 @@ program
 
       // Approve first (required before execution can start), then run to completion.
       engine.approveBlueprint({ approvedBy: options.approvedBy });
-      void engine.runUntilDone();
+      await engine.runUntilDone();
 
       const targetEnv =
         options.targetEnv === 'STAGING' ? ('STAGING' as const) : ('PRODUCTION' as const);
@@ -412,6 +417,48 @@ program
 
       if (state.releasePromoted) {
         console.log('\nRelease promoted to target environment.');
+      }
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+/**
+ * Command: fable drift-detect <snapshot.json>
+ * Evaluates cross-repo contract version pins and SCIP symbol references for breaking drift.
+ */
+program
+  .command('drift-detect')
+  .description('Detect cross-repo contract version drift and orphaned SCIP symbol references')
+  .argument('<snapshotPath>', 'Path to JSON file containing publishedContracts and consumerPins')
+  .action((snapshotPath) => {
+    try {
+      const fullPath = path.resolve(process.cwd(), snapshotPath);
+      if (!fs.existsSync(fullPath)) {
+        console.error(`Error: Drift snapshot file not found: ${fullPath}`);
+        process.exit(1);
+      }
+
+      const parsed = JSON.parse(fs.readFileSync(fullPath, 'utf8')) as {
+        publishedContracts?: PublishedContractRecord[];
+        consumerPins?: ConsumerPinRecord[];
+      };
+
+      const report = DriftDetector.detectDrift({
+        publishedContracts: parsed.publishedContracts ?? [],
+        consumerPins: parsed.consumerPins ?? [],
+      });
+
+      console.log('\n--- Fable Engine v3 — Cross-Repo Drift Detection ---');
+      console.log(`Breaking Drift: ${report.hasBreakingDrift ? 'YES (ACTION REQUIRED)' : 'NONE'}`);
+      console.log(`Findings: ${report.findings.length}`);
+      for (const finding of report.findings) {
+        console.log(`  [${finding.severity}] ${finding.category}: ${finding.detail}`);
+      }
+
+      if (report.hasBreakingDrift) {
+        process.exit(1);
       }
     } catch (err) {
       console.error(`Error: ${(err as Error).message}`);

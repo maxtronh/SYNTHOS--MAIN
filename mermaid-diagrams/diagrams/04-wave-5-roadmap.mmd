@@ -1,18 +1,18 @@
 flowchart LR
-    subgraph W5 [\"Wave 5: Production Readiness & Integrations (Phases 30-40)\"]
-        P30[\"P30: CI/CD Pipeline & Release Automation\"] --> P31[\"P31: Observability & SLO Alerts\"]
-        P31 --> P32[\"P32: SSO / OIDC + OPA RBAC\""]
-        P32 --> P33[\"P33: CLI approve / promote / drift-detect\""]
-        P33 --> P34[\"P34: Multi-Region Canary + SLSA Rollback\""]
-        P34 --> P35[\"P35: Cross-Repo Drift Detection\""]
-        P35 --> P36[\"P36: Vault / Cloud Secrets Backend\""]
-        P36 --> P37[\"P37: Disaster Recovery Runbook\""]
-        P37 --> P38[\"P38: Production Sign-Off Gate\""]
-        P38 --> P39[\"P39: LLM Model Registry + Persona Versioning\""]
-        P39 --> P40[\"P40: Operator Console React Migration\""]
+    subgraph W5 ["Wave 5: Production Readiness & Integrations (Phases 30-40)"]
+        P30["P30: CI/CD Pipeline & Release Automation"] --> P31["P31: Observability & SLO Alerts"]
+        P31 --> P32["P32: SSO / OIDC + OPA RBAC"]
+        P32 --> P33["P33: CLI approve / promote / drift-detect"]
+        P33 --> P34["P34: Multi-Region Canary + SLSA Rollback"]
+        P34 --> P35["P35: Cross-Repo Drift Detection"]
+        P35 --> P36["P36: Vault / Cloud Secrets Backend"]
+        P36 --> P37["P37: Disaster Recovery Runbook"]
+        P37 --> P38["P38: Production Sign-Off Gate"]
+        P38 --> P39["P39: LLM Model Registry + Persona Versioning"]
+        P39 --> P40["P40: Operator Console React Migration"]
     end
 
-    W4[\"Wave 4 (Complete)\"] --> W5
+    W4["Wave 4 (Complete)"] --> W5
 
     style W5 fill:#e1f5fe,stroke:#01579b,stroke-width:2px
     style W4 fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px

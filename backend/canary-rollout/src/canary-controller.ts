@@ -108,6 +108,17 @@ export class CanaryRolloutController {
     return this.state;
   }
 
+  /**
+   * Forces immediate rollback to 0% weight regardless of current step (used by global multi-region abort).
+   */
+  public forceRollback(reason: string): CanaryRolloutState {
+    this.state.status = 'ROLLED_BACK';
+    this.state.currentWeightPercent = 0;
+    this.state.rollbackReason = reason;
+    this.state.updatedAt = new Date().toISOString();
+    return this.state;
+  }
+
   private detectSloBreach(sample: CanaryMetricSample): string | null {
     if (sample.errorRate > this.thresholds.maxErrorRate) {
       return `Error rate ${(sample.errorRate * 100).toFixed(2)}% exceeded max threshold ${(this.thresholds.maxErrorRate * 100).toFixed(2)}%`;

@@ -29,6 +29,10 @@ export class ScipSemanticGraph {
     }
   }
 
+  public hasDefinition(symbolId: string): boolean {
+    return this.definitions.has(symbolId);
+  }
+
   /**
    * Builds cross-repository package dependency edges from SCIP symbol references.
    */
